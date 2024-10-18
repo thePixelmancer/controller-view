@@ -5,7 +5,7 @@ function removeChildren(parent) {
 }
 function objectEntries(input) {
   return input.map((item) => {
-    if (typeof item === 'string') {
+    if (typeof item === "string") {
       return { key: item, value: "" };
     } else {
       const [[key, value]] = Object.entries(item);
@@ -27,25 +27,31 @@ class Controller {
     removeChildren(stateList);
     Object.keys(this.states).forEach((state) => {
       const stateBox = document.createElement("li");
-      const stateBoxTitle = document.createElement("h2");
-      const stateAnimationsBox = document.createElement("ul");
-      const stateAnimationsBoxTitle = document.createElement("h3");
-      stateAnimationsBoxTitle.innerText = "Animations";
-      stateAnimationsBox.appendChild(stateAnimationsBoxTitle);
-      const stateBlendValue = document.createElement("p");
-
-      stateBoxTitle.innerText = state;
-
+      stateBox.innerHTML = `
+      <li class = "state-box">
+        <div class = "state-box-title">
+          <h2>State: ${state}</h2>
+        </div>
+        <div class = "state-box-content">
+          <h3>Animations:</h3>
+          <ul class = "animation-list"></ul>
+          <ul>
+          <h3>Transitions:</h3>
+          <ul class = "transition-list"></ul>
+          </ul>
+        </div>
+      </li>
+      `;
       objectEntries(this.states[state].animations).forEach((animation) => {
-        const animationLine = document.createElement("li");
-        animationLine.innerText = ` ${animation.key} : ${animation.value}`;
-        stateAnimationsBox.appendChild(animationLine);
-      });
-
-      stateBlendValue.innerText = this.states[state].blend_transition;
-      stateBox.appendChild(stateBoxTitle);
-      stateBox.appendChild(stateAnimationsBox);
-      stateBox.appendChild(stateBlendValue);
+        const animationBox = document.createElement("li");
+        animationBox.innerText = `${animation.key} ${animation.value}`;
+        stateBox.querySelector(".animation-list").appendChild(animationBox);
+      })
+      objectEntries(this.states[state].transitions).forEach((transition) => {
+        const transitionBox = document.createElement("li");
+        transitionBox.innerText = `${transition.key} ${transition.value}`;
+        stateBox.querySelector(".transition-list").appendChild(transitionBox);
+      })
       stateList.appendChild(stateBox);
     });
   }

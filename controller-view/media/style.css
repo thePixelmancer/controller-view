@@ -103,10 +103,25 @@ textarea::placeholder {
   flex-direction: column;
   gap: 20px;
 }
-#state-list li {
+.state-box {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  background-color: rgb(41, 44, 54);
+}
+.state-box-title {
+  background-color: rgb(34, 84, 158);
   padding: 10px;
-  background-color: var(--vscode-input-background);
+}
+.state-box-content {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+.animation-list {
+  list-style-type: none;
+  margin-left: 10px;
+}
+.transition-list {
+  list-style-type: none;
+  margin-left: 10px;
 }
