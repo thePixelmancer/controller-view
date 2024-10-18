@@ -107,6 +107,10 @@ textarea::placeholder {
   display: flex;
   flex-direction: column;
   background-color: rgb(41, 44, 54);
+  filter: drop-shadow(0px 10px 20px rgba(0, 0, 0, 0.3));
+}
+.state-box:focus{
+  outline-color: var(--vscode-focusBorder);
 }
 .state-box-title {
   background-color: rgb(34, 84, 158);

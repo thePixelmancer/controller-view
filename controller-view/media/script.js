@@ -3,6 +3,40 @@ function removeChildren(parent) {
     parent.removeChild(parent.firstChild);
   }
 }
+function colorCode(input) {
+  const fragment = document.createDocumentFragment();
+
+  // Regular expression to split the string into meaningful parts
+  const parts = input.split(/([a-zA-Z_][a-zA-Z0-9_]*|\d+|==|=|\.)/g);
+
+  parts.forEach((part) => {
+    let span = document.createElement("span");
+
+    // Add colors based on the type of part
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(part)) {
+      // Variables: yellow
+      span.style.color = "skyblue";
+    } else if (/^\d+$/.test(part)) {
+      // Numbers: orange
+      span.style.color = "violet";
+    } else if (part === ".") {
+      // Dots: orange
+      span.style.color = "skyblue";
+    } else if (part === "==" || part === "=") {
+      // Equals: green
+      span.style.color = "red";
+    } else {
+      // Plain text or anything else
+      span.style.color = "white";
+    }
+
+    // Set the content of the span as text
+    span.appendChild(document.createTextNode(part));
+    fragment.appendChild(span);
+  });
+
+  return fragment;
+}
 function objectEntries(input) {
   return input.map((item) => {
     if (typeof item === "string") {
@@ -28,7 +62,7 @@ class Controller {
     Object.keys(this.states).forEach((state) => {
       const stateBox = document.createElement("li");
       stateBox.innerHTML = `
-      <li class = "state-box">
+      <li class = "state-box" tabindex = "0">
         <div class = "state-box-title">
           <h2>State: ${state}</h2>
         </div>
@@ -46,12 +80,13 @@ class Controller {
         const animationBox = document.createElement("li");
         animationBox.innerText = `${animation.key} ${animation.value}`;
         stateBox.querySelector(".animation-list").appendChild(animationBox);
-      })
+      });
       objectEntries(this.states[state].transitions).forEach((transition) => {
         const transitionBox = document.createElement("li");
-        transitionBox.innerText = `${transition.key} ${transition.value}`;
+        transitionBox.innerText = `${transition.key}: `;
+        transitionBox.appendChild(colorCode(`${transition.value}`));
         stateBox.querySelector(".transition-list").appendChild(transitionBox);
-      })
+      });
       stateList.appendChild(stateBox);
     });
   }
