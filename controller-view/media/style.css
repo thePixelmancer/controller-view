@@ -9,6 +9,10 @@
   --input-padding-horizontal: 4px;
   --input-margin-vertical: 4px;
   --input-margin-horizontal: 0;
+
+  --bb-background: #282b2d;
+  --bb-box-background: #212325;
+  --bb-box-title-background: #323638;
 }
 
 body {
@@ -17,7 +21,7 @@ body {
   font-size: var(--vscode-font-size);
   font-weight: var(--vscode-font-weight);
   font-family: var(--vscode-font-family);
-  background-color: var(--vscode-editor-background);
+  background-color: var(--bb-background);
 }
 
 body > *,
@@ -106,26 +110,38 @@ textarea::placeholder {
 .state-box {
   display: flex;
   flex-direction: column;
-  background-color: rgb(41, 44, 54);
-  filter: drop-shadow(0px 10px 20px rgba(0, 0, 0, 0.3));
+  background-color: var(--bb-box-background);
+  filter: drop-shadow(0px 10px 10px rgba(0, 0, 0, 0.1));
 }
 .state-box:focus{
   outline-color: var(--vscode-focusBorder);
 }
 .state-box-title {
-  background-color: rgb(34, 84, 158);
-  padding: 10px;
+  background-color: var(--bb-box-title-background);
+  padding: 5px;
 }
 .state-box-content {
   display: flex;
   flex-direction: column;
   padding: 10px;
 }
-.animation-list {
+.animation-list, .transition-list{
+  display: flex;
+  flex-direction: column;
   list-style-type: none;
-  margin-left: 10px;
+  gap: 5px;
+  margin-left: 20px;
 }
-.transition-list {
-  list-style-type: none;
-  margin-left: 10px;
+.animation-list li, .transition-list li{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-left: 10px;
+  border-left: 7px solid var(--bb-box-title-background);
+}
+.value-text {
+  background-color: black;
+  border-radius: 3px;
+  min-height: 1em;
+  padding: 5px;
 }
