@@ -1,6 +1,4 @@
 * {
-  margin: 0px;
-  padding: 0px;
   box-sizing: border-box;
 }
 :root {
@@ -95,11 +93,28 @@ textarea::placeholder {
   color: var(--vscode-input-placeholderForeground);
 }
 /* ------------------------------------------------------------------------------------ */
+body {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
 #main-panel {
   display: flex;
   flex-direction: column;
-  width: 70%;
-  margin: 0px auto;
+  flex: 3;
+  flex: 0 1 60%;
+}
+#simulation-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 30%;
+  background-color: var(--bb-box-background);
+  padding: 10px;
+}
+#arrows-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 10%;
 }
 #state-list {
   list-style-type: none;
@@ -125,14 +140,14 @@ textarea::placeholder {
   flex-direction: column;
   padding: 10px;
 }
-.animation-list, .transition-list{
+.animation-list, .transition-list, #queries-list {
   display: flex;
   flex-direction: column;
   list-style-type: none;
   gap: 5px;
   margin-left: 20px;
 }
-.animation-list li, .transition-list li{
+.animation-list li, .transition-list li, #queries-list li{
   display: flex;
   gap: 10px;
   align-items: center;
@@ -144,4 +159,8 @@ textarea::placeholder {
   border-radius: 3px;
   min-height: 1em;
   padding: 5px;
+}
+#simulation-header {
+  display: flex;
+  gap: 10px
 }

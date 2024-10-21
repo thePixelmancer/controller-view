@@ -8,12 +8,20 @@
     <title>Controller Viewer</title>
   </head>
   <body>
-    <div id="main-panel">
-      <h1>Controller Viewer</h1>
-      <button id="start-simulation-btn">Simulate</button>
-      <button id="stop-simulation-btn">Stop</button>
+    <div id="arrows-panel"></div>
+    <main id="main-panel">
+      <h1>Animation Controller</h1>
       <ul id="state-list"></ul>
-    </div>
+    </main>
+    <aside id="simulation-panel">
+      <div id="simulation-header">
+        <h1>Simulation</h1>
+        <button id="start-simulation-btn">Start</button>
+        <button id="stop-simulation-btn">Stop</button>
+      </div>
+      <ul id="queries-list">
+      </ul>
+    </aside>
     <script src="{{scriptUri}}"></script>
   </body>
 </html>

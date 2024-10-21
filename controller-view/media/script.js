@@ -17,10 +17,30 @@ class Controller {
   constructor(controllerData = {}) {
     this.initialState = controllerData.initial_state;
     this.states = controllerData.states;
+    this.queries = [];
   }
   updateData(controllerData) {
     this.initialState = controllerData.initial_state;
     this.states = controllerData.states;
+    this.updateQueries();
+  }
+  updateQueries() {
+    const queries = [];
+    Object.keys(this.states).forEach((state) => {
+      this.states[state].transitions.forEach((transition) => {
+        queries.push(Object.values(transition)[0]);
+      })
+    });
+    this.queries = [...new Set(queries)];
+  }
+  populateQueryList() {
+    const queryList = document.getElementById("queries-list");
+    removeChildren(queryList);
+    this.queries.forEach((query) => {
+      const queryBox = document.createElement("li");
+      queryBox.innerHTML = `<input type = "checkbox" name = ${query} id = ${query}><label for = ${query} class = "value-text">${query}</label>`;
+      queryList.appendChild(queryBox);
+    });
   }
   populateStateList() {
     const stateList = document.getElementById("state-list");
@@ -71,4 +91,5 @@ const controller = new Controller();
 function main(controllerData) {
   controller.updateData(controllerData);
   controller.populateStateList();
+  controller.populateQueryList();
 }
