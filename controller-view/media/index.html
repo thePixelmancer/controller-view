@@ -3,25 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="{{resetStyleUri}}" />
-    <link rel="stylesheet" href="{{styleUri}}" />
+    <link rel="stylesheet" href="./reset.css" />
+    <link rel="stylesheet" href="./style.css" />
     <title>Controller Viewer</title>
   </head>
   <body>
-    <div id="arrows-panel"></div>
     <main id="main-panel">
       <h1>Animation Controller</h1>
-      <ul id="state-list"></ul>
+      <div id="graph"></div>
     </main>
-    <aside id="simulation-panel">
-      <div id="simulation-header">
-        <h1>Simulation</h1>
-        <button id="start-simulation-btn">Start</button>
-        <button id="stop-simulation-btn">Stop</button>
-      </div>
-      <ul id="queries-list">
-      </ul>
-    </aside>
-    <script src="{{scriptUri}}"></script>
+    <script src="./script.js"></script>
   </body>
 </html>
+ 

@@ -15,7 +15,7 @@ function activate(context) {
       // Only operate on JSON files
       const filePath = editor.document.uri.fsPath;
       if (!filePath.endsWith(".json")) {
-        vscode.window.showErrorMessage("This is not a valid JSON file.");
+        vscode.window.showErrorMessage("This is not a JSON file.");
         return;
       }
 
