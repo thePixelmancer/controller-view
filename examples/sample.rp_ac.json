@@ -13,13 +13,13 @@
           ],
           "blend_transition": 0.2
         },
-        "attack": {
+        "attack": { 
           "animations": [
             "idle_base",
             "attack_acid"
           ],
           "transitions": [
-            {"default": "q.all_animations_finished"}
+            {"default": "query.all"}
           ],
           "blend_transition": 0
         },

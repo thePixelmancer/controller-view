@@ -14,7 +14,7 @@
 }
 
 body {
-  padding: 0 var(--container-padding);
+  padding: 0;
   color: var(--vscode-foreground);
   font-size: var(--vscode-font-size);
   font-weight: var(--vscode-font-weight);
@@ -95,11 +95,73 @@ textarea::placeholder {
 /* ------------------------------------------------------------------------------------ */
 body {
   display: flex;
-  flex-direction: row;
-  gap: 10px;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-#main-panel {
+main {
   display: flex;
   flex-direction: column;
   position: relative;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+}
+main h1 {
+  margin: 0 0 20px 0;
+  padding: 0;
+  text-align: center;
+  font-size: 1.5em;
+  color: var(--vscode-foreground);
+}
+.controllers {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  width: 100%;
+  max-width: 1200px;
+  align-items: center;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.controller {
+  width: 100%;
+  background: var(--bb-box-background);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--bb-box-title-background);
+  list-style: none;
+}
+.controller-title {
+  margin: 0 0 15px 0;
+  padding: 0;
+  color: var(--vscode-foreground);
+  font-size: 1.2em;
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 1px solid var(--bb-box-title-background);
+  padding-bottom: 10px;
+}
+.controller svg {
+  width: 100% !important;
+  height: auto !important;
+  max-width: none !important;
+  min-height: 400px !important;
+  display: block;
+  margin: 0 auto;
+}
+#console {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: monospace;
+  font-size: 12px;
+  color: white;
 }

@@ -3,16 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="./reset.css" />
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="{{resetStyleUri}}" />
+    <link rel="stylesheet" href="{{styleUri}}" />
     <title>Controller Viewer</title>
   </head>
   <body>
-    <main id="main-panel">
-      <h1>Animation Controller</h1>
-      <div id="graph"></div>
+    <main>
+      <h1>Controller Viewer</h1>
+      <ul id="controllers"></ul>
+      <div id="console"></div>
     </main>
-    <script src="./script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="{{scriptUri}}"></script>
   </body>
 </html>
- 

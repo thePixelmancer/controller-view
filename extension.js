@@ -5,7 +5,7 @@ const fs = require("fs");
 function activate(context) {
   // Register a command to open the custom editor
   context.subscriptions.push(
-    vscode.commands.registerCommand("controller-view.openEditor", () => {
+    vscode.commands.registerCommand("controller-view.openViewer", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showErrorMessage("Please open a JSON file.");
@@ -20,10 +20,15 @@ function activate(context) {
       }
 
       // Create and show the webview panel
-      const panel = vscode.window.createWebviewPanel("controller-view", "Live JSON Viewer", vscode.ViewColumn.One, {
-        enableScripts: true,
-        localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, "media"))],
-      });
+      const panel = vscode.window.createWebviewPanel(
+        "controller-view",
+        "Animation Controller Graph",
+        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+        {
+          enableScripts: true,
+          localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, "media"))],
+        }
+      );
 
       // Load the initial HTML content into the webview
       panel.webview.html = getWebviewContent(panel.webview, context.extensionPath);
@@ -76,8 +81,11 @@ function getWebviewContent(webview, extensionPath) {
 
   const htmlPath = path.join(extensionPath, "media", "index.html");
   let htmlContent = fs.readFileSync(htmlPath, "utf8");
-  htmlContent = htmlContent.replace(/{{styleUri}}/g, styleUri).replace(/{{scriptUri}}/g, scriptUri).replace(/{{resetStyleUri}}/g, resetStyleUri);
-	return htmlContent;
+  htmlContent = htmlContent
+    .replace(/{{styleUri}}/g, styleUri)
+    .replace(/{{scriptUri}}/g, scriptUri)
+    .replace(/{{resetStyleUri}}/g, resetStyleUri);
+  return htmlContent;
 }
 
 // Export the activate function
