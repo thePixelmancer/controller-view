@@ -2,8 +2,95 @@ const vscode = require("vscode");
 const path = require("path");
 const fs = require("fs");
 
+// Track if the panel is currently open
+let currentPanel = null;
+
 function activate(context) {
-  // Register a command to open the custom editor
+  // Function to check if a file is a valid controller file
+  const isValidControllerFile = (document) => {
+    if (!document || !document.uri.fsPath.endsWith(".json")) {
+      return false;
+    }
+
+    try {
+      const content = JSON.parse(document.getText());
+      // Check if it's a valid controller file (you can customize this logic)
+      return content.animation_controllers && Object.keys(content.animation_controllers).length > 0;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Function to create and show the webview panel
+  const createPanel = () => {
+    const panel = vscode.window.createWebviewPanel(
+      "controller-view",
+      "Animation Controller Graph",
+      { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+      {
+        enableScripts: true,
+        localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, "media"))],
+      }
+    );
+
+    // Load the initial HTML content into the webview
+    panel.webview.html = getWebviewContent(panel.webview, context.extensionPath);
+
+    // Function to update the webview content
+    const updateWebview = () => {
+      const newEditor = vscode.window.activeTextEditor;
+      if (newEditor && isValidControllerFile(newEditor.document)) {
+        panel.webview.postMessage({
+          type: "update",
+          json: newEditor.document.getText(),
+        });
+      }
+    };
+
+    // Subscribe to changes in the document
+    const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
+      if (event.document && isValidControllerFile(event.document)) {
+        updateWebview();
+      }
+    });
+
+    // Update the webview with the initial content
+    updateWebview();
+
+    // Clean up when the webview is disposed
+    panel.onDidDispose(() => {
+      changeSubscription.dispose();
+      currentPanel = null;
+    });
+
+    return panel;
+  };
+
+  // Listen for when the active text editor changes
+  const activeEditorChangeSubscription = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (!editor || !isValidControllerFile(editor.document)) {
+      return;
+    }
+
+    const config = vscode.workspace.getConfiguration("controllerView");
+    if (!currentPanel) {
+      // Only auto-create panel if autoOpen is true
+      if (config.get("autoOpen") === true) {
+        currentPanel = createPanel();
+      } else {
+        // autoOpen disabled, so do NOT create panel automatically
+        return;
+      }
+    }
+
+    // If panel exists, always update (regardless of autoOpen setting)
+    currentPanel.webview.postMessage({
+      type: "update",
+      json: editor.document.getText(),
+    });
+  });
+
+  // Register a command to manually open the custom editor
   context.subscriptions.push(
     vscode.commands.registerCommand("controller-view.openViewer", () => {
       const editor = vscode.window.activeTextEditor;
@@ -12,61 +99,46 @@ function activate(context) {
         return;
       }
 
-      // Only operate on JSON files
-      const filePath = editor.document.uri.fsPath;
-      if (!filePath.endsWith(".json")) {
-        vscode.window.showErrorMessage("This is not a JSON file.");
+      // Only operate on valid controller files
+      if (!isValidControllerFile(editor.document)) {
+        vscode.window.showErrorMessage("This is not a valid controller file.");
         return;
       }
 
-      // Create and show the webview panel
-      const panel = vscode.window.createWebviewPanel(
-        "controller-view",
-        "Animation Controller Graph",
-        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-        {
-          enableScripts: true,
-          localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, "media"))],
-        }
-      );
-
-      // Load the initial HTML content into the webview
-      panel.webview.html = getWebviewContent(panel.webview, context.extensionPath);
-
-      // Function to update the webview content
-      const updateWebview = () => {
-        const newEditor = vscode.window.activeTextEditor;
-        panel.webview.postMessage({
+      // If panel is already open, just update it
+      if (currentPanel) {
+        currentPanel.webview.postMessage({
           type: "update",
-          json: newEditor.document.getText(), // Send the document text as JSON
+          json: editor.document.getText(),
         });
-      };
+        return;
+      }
 
-      // Subscribe to changes in the document
-      const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-        if (event.document) {
-          updateWebview(); // Resend the updated content to the webview
-        }
-      });
-
-      // Listen for when the active text editor changes
-      const activeEditorChangeSubscription = vscode.window.onDidChangeActiveTextEditor((newEditor) => {
-        if (newEditor) {
-          // Update the panel with the new document's content
-          updateWebview();
-        }
-      });
-
-      // Update the webview with the initial content
-      updateWebview();
-
-      // Clean up when the webview is disposed
-      panel.onDidDispose(() => {
-        changeSubscription.dispose();
-        activeEditorChangeSubscription.dispose();
-      });
+      // Create new panel
+      currentPanel = createPanel();
     })
   );
+  // Register a command to toggle the auto-open setting
+  context.subscriptions.push(
+    vscode.commands.registerCommand("controller-view.toggleAutoOpen", async () => {
+      const config = vscode.workspace.getConfiguration("controllerView");
+      const current = config.get("autoOpen", true);
+
+      // Toggle the boolean setting
+      await config.update("autoOpen", !current, vscode.ConfigurationTarget.Global);
+
+      vscode.window.showInformationMessage(`Controller View Auto Open is now ${!current ? "enabled" : "disabled"}`);
+    })
+  );
+  // Add the active editor change subscription to context
+  context.subscriptions.push(activeEditorChangeSubscription);
+
+  // Check if the currently active editor is a valid controller file on activation
+  const activeEditor = vscode.window.activeTextEditor;
+  const config = vscode.workspace.getConfiguration("controllerView");
+  if (config.get("autoOpen") === true && activeEditor && isValidControllerFile(activeEditor.document)) {
+    currentPanel = createPanel();
+  }
 }
 
 // Helper function to return the HTML content for the webview

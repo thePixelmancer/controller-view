@@ -1,7 +1,7 @@
 {
   "name": "controller-view",
   "displayName": "Controller View",
-  "description": "view animation controllers",
+  "description": "Preview minecraft [bedrock] animation controllers as graphs.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.94.0"
@@ -9,14 +9,32 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./extension.js",
   "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Controller View",
+      "properties": {
+        "controllerView.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the animation controller graph window when a valid controller file is focused."
+        }
+      }
+    },
     "commands": [
       {
+        "command": "controller-view.toggleAutoOpen",
+        "category": "Animation Controllers",
+        "title": "Toggle Graph Auto Open"
+      },
+      {
         "command": "controller-view.openViewer",
-        "category": "AC Viewer",
-        "title": "AC Viewer: Open Viewer"
+        "category": "Animation Controllers",
+        "title": "Open graph preview window"
       }
     ]
   },
