@@ -1,54 +1,70 @@
 {
   "name": "controller-view",
-  "displayName": "Controller View",
-  "description": "Preview minecraft [bedrock] animation controllers as graphs.",
-  "version": "0.0.1",
+  "displayName": "Animation Controller Graph Viewer",
+  "description": "Visual graph viewer for Minecraft Bedrock animation controller files",
+  "version": "1.0.0",
+  "publisher": "Pixelmancer",
   "engines": {
-    "vscode": "^1.94.0"
+    "vscode": "^1.60.0"
   },
   "categories": [
+    "Visualization",
     "Other"
+  ],
+  "keywords": [
+    "minecraft",
+    "bedrock",
+    "animation",
+    "controller",
+    "graph",
+    "visualization",
+    "resource pack",
+    "bedrock"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
   "main": "./extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "controller-view.openViewer",
+        "title": "Open Animation Controller Graph",
+        "category": "Controller View"
+      },
+      {
+        "command": "controller-view.toggleAutoOpen",
+        "title": "Toggle Auto Open",
+        "category": "Controller View"
+      }
+    ],
     "configuration": {
-      "type": "object",
       "title": "Controller View",
       "properties": {
         "controllerView.autoOpen": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically open the animation controller graph window when a valid controller file is focused."
+          "description": "Automatically open the controller graph when opening a valid controller file"
         }
       }
-    },
-    "commands": [
-      {
-        "command": "controller-view.toggleAutoOpen",
-        "category": "Animation Controllers",
-        "title": "Toggle Graph Auto Open"
-      },
-      {
-        "command": "controller-view.openViewer",
-        "category": "Animation Controllers",
-        "title": "Open graph preview window"
-      }
-    ]
+    }
   },
   "scripts": {
-    "lint": "eslint .",
-    "pretest": "npm run lint",
-    "test": "vscode-test"
+    "vscode:prepublish": "npm run compile",
+    "compile": "echo 'No compilation needed'",
+    "package": "vsce package",
+    "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.8",
-    "@types/node": "20.x",
-    "@types/vscode": "^1.94.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.11.1"
-  }
+    "@vscode/vsce": "^2.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/controller-view.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/controller-view/issues"
+  },
+  "homepage": "https://github.com/yourusername/controller-view#readme",
+  "license": "MIT"
 }

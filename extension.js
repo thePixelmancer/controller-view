@@ -163,4 +163,10 @@ function getWebviewContent(webview, extensionPath) {
 // Export the activate function
 module.exports = {
   activate,
+  deactivate() {
+    if (currentPanel) {
+      currentPanel.dispose();
+      currentPanel = null;
+    }
+  }
 };

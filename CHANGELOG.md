@@ -1,9 +1,11 @@
 # Change Log
 
-All notable changes to the "controller-view" extension will be documented in this file.
+## [1.0.0] - 2024-01-01
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
+### Added
 - Initial release
+- Visual graph viewer for animation controller files
+- Auto-open functionality
+- Real-time updates when editing controller files
+- Manual toggle for auto-open behavior
+- Command palette integration
