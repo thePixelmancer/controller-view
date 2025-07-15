@@ -55,10 +55,11 @@ function translateData(data) {
     const states = data.states;
     Object.keys(states).forEach((state) => {
       const transitions = states[state].transitions;
+      const animations = states[state].animations;
       //define states
       graphCode += `state_${state} : ${state}\n `;
       //define transitions
-      transitions.forEach((transition) => {
+      transitions?.forEach((transition) => {
         const transitionDetails = Object.entries(transition)[0]; // returns []
         graphCode += `state_${state} --> state_${transitionDetails[0]} : ${transitionDetails[1]}\n `;
       });
