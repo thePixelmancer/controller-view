@@ -4,7 +4,7 @@ node_modules/**
 *.vsix
 .gitignore
 .git/**
-!images/**
 **/*.map
-**/eslint.config.mjs
-**/.vscode-test.*
+**/*.ts
+!images/**
+!media/**

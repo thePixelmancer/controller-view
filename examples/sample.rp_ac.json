@@ -4,33 +4,26 @@
     "controller.animation.sample": {
       "states": {
         "default": {
-          "animations": [
-            "idle_base"
-          ],
-          "transitions": [ 
-            { "attack": "q.is_charged"},
-            { "summon": "q.is_casting"}
+          "animations": ["idle_base"],
+          "transitions": [
+            { "attack": "q.is_charged" },
+            { "attack": "q.is_charged" }
           ],
           "blend_transition": 0.2
         },
-        "attack": { 
-          "animations": [
-            "idle_base",
-            "attack_acid"
-          ],
-          "transitions": [
-            {"default": "query.all"}
-          ],
+        "attack": {
+          "animations": ["idle_base", "attack_acid"],
+          "transitions": [{ "default": "query.all" }],
           "blend_transition": 0
         },
         "summon": {
-          "animations": [
-            {"idle_base": "v.is_on_ground"},
-            "attack_summon"
-          ],
-          "transitions": [
-            {"default": "!q.is_casting"}
-          ],
+          "animations": [{ "idle_base": "v.is_on_ground" }, "attack_summon"],
+          "transitions": [{ "default": "!q.is_casting" }],
+          "blend_transition": 0
+        },
+         "summon": {
+          "animations": [{ "idle_base": "v.is_on_ground" }, "attack_summon"],
+          "transitions": [{ "default": "!q.is_casting" }],
           "blend_transition": 0
         }
       }
