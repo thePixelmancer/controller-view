@@ -25,9 +25,9 @@ function generateElements(jsonData) {
     controllerTitle.textContent = controllerName;
     controllerItem.appendChild(controllerTitle);
     // Create svg element
-    const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg")
-    svgElement.setAttribute("width", "960")
-    svgElement.setAttribute("height", "600")
+    const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svgElement.setAttribute("width", "960");
+    svgElement.setAttribute("height", "600");
     svgElement.innerHTML = "<g></g>";
     controllerItem.appendChild(svgElement);
     controllersList.appendChild(controllerItem);
@@ -40,29 +40,31 @@ function generateElements(jsonData) {
         ranksep: 50,
         nodesep: 30,
       });
-
-      // States and transitions from RFC 793
-      const states = ["CLOSED", "LISTEN", "SYN RCVD", "SYN SENT", "ESTAB", "FINWAIT-1", "CLOSE WAIT", "FINWAIT-2", "CLOSING", "LAST-ACK", "TIME WAIT"];
-
+      const initialState = jsonData.animation_controllers[controllerName].initial_state || "default";
+      const states = Object.keys(jsonData.animation_controllers[controllerName].states);
+      if (!states.includes(initialState)) {
+        throw new Error(`Initial state ${initialState} not found in controller!`);
+      }
       // Automatically label each of the nodes
-      states.forEach(function (state) {
-        g.setNode(state, { label: state });
+      states.forEach((state) => {
+        g.setNode(state, { label: state, rx: 2, ry: 2 });
       });
 
-      // Set up the edges with different curve styling to show all possibilities
-      g.setEdge("CLOSED", "LISTEN", { label: "open (curveBasis)", curve: d3.curveBasis });
-      g.setEdge("LISTEN", "SYN RCVD", { label: "rcv SYN (curveBundle)", curve: d3.curveBasis });
-      g.setEdge("LISTEN", "SYN SENT", { label: "send (curveCardinal)", curve: d3.curveBasis });
-
-      // Set some general styles
-      g.nodes().forEach(function (v) {
-        const node = g.node(v);
-        node.rx = node.ry = 5;
+      states.forEach((state) => {
+        const transitions = jsonData.animation_controllers[controllerName].states[state].transitions;
+        transitions.forEach((transition) => {
+          const entries = Object.entries(transition);
+          entries.forEach((entry) => {
+            try {
+              g.setEdge(state, entry[0], { label: entry[1], curve: d3.curveBasis });
+            } catch (error) {
+              console.error(`Error setting edge ${state} -> ${entry[0]}:  `, error);
+            }
+          });
+        });
       });
 
-      // Add some custom colors based on state
-      g.node("CLOSED").style = "fill: #f77";
-      g.node("ESTAB").style = "fill: #7f7";
+      g.node(initialState).style = "fill:rgb(122, 160, 211)";
       /* ------------------------------------------------------------------------------------ */
 
       const svg = d3.select(svgElement);

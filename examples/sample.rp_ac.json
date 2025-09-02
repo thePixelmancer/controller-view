@@ -6,24 +6,13 @@
         "default": {
           "animations": ["idle_base"],
           "transitions": [
-            { "attack": "q.is_charged" },
-            { "attack": "q.is_charged" }
+            { "attacka": "v.attack_time >= 0" }
           ],
           "blend_transition": 0.2
         },
-        "attack": {
+        "attacka": {
           "animations": ["idle_base", "attack_acid"],
-          "transitions": [{ "default": "query.all" }],
-          "blend_transition": 0
-        },
-        "summon": {
-          "animations": [{ "idle_base": "v.is_on_ground" }, "attack_summon"],
-          "transitions": [{ "default": "!q.is_casting" }],
-          "blend_transition": 0
-        },
-         "summon": {
-          "animations": [{ "idle_base": "v.is_on_ground" }, "attack_summon"],
-          "transitions": [{ "default": "!q.is_casting" }],
+          "transitions": [{ "default": "query.test1" }],
           "blend_transition": 0
         }
       }
