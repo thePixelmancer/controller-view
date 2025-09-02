@@ -16,6 +16,7 @@ window.addEventListener("message", (event) => {
 function generateElements(jsonData) {
   const controllersList = document.querySelector("#controllers");
   controllersList.innerHTML = ""; // Clear previous content
+  document.getElementById("console").innerText = ""; // Clear previous content
   const controllerKeys = Object.keys(jsonData.animation_controllers);
 
   for (const controllerName of controllerKeys) {
@@ -24,12 +25,19 @@ function generateElements(jsonData) {
     const controllerTitle = document.createElement("h2");
     controllerTitle.textContent = controllerName;
     controllerItem.appendChild(controllerTitle);
-    // Create svg element
+    // Create a container for the SVG
+    const svgContainer = document.createElement("div");
+    svgContainer.className = "svg-container";
+
+    // Create SVG element
     const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svgElement.setAttribute("width", "960");
+    svgElement.setAttribute("width", "100%");
     svgElement.setAttribute("height", "600");
+    svgElement.style.display = "block";
     svgElement.innerHTML = "<g></g>";
-    controllerItem.appendChild(svgElement);
+
+    svgContainer.appendChild(svgElement);
+    controllerItem.appendChild(svgContainer);
     controllersList.appendChild(controllerItem);
     /* ------------------------------------------------------------------------------------ */
     try {
@@ -43,11 +51,11 @@ function generateElements(jsonData) {
       const initialState = jsonData.animation_controllers[controllerName].initial_state || "default";
       const states = Object.keys(jsonData.animation_controllers[controllerName].states);
       if (!states.includes(initialState)) {
-        throw new Error(`Initial state ${initialState} not found in controller!`);
+        throw new Error(`Initial state [${initialState}] not found in controller [${controllerName}]!`);
       }
       // Automatically label each of the nodes
       states.forEach((state) => {
-        g.setNode(state, { label: state, rx: 2, ry: 2 });
+        g.setNode(state, { label: state, rx: 2, ry: 2, class: state === initialState ? "initial-state" : "" });
       });
 
       states.forEach((state) => {
@@ -56,15 +64,18 @@ function generateElements(jsonData) {
           const entries = Object.entries(transition);
           entries.forEach((entry) => {
             try {
-              g.setEdge(state, entry[0], { label: entry[1], curve: d3.curveBasis });
+              g.setEdge(state, entry[0], {
+                label: entry[1],
+                curve: d3.curveBasis,
+                labelOffset: 0, // Offset the label from the edge
+                labelPos: "c", // Center the label on the edge
+              });
             } catch (error) {
-              console.error(`Error setting edge ${state} -> ${entry[0]}:  `, error);
+              throw new Error(`Error setting edge ${state} -> ${entry[0]} in controller [${controllerName}]:`, error);
             }
           });
         });
       });
-
-      g.node(initialState).style = "fill:rgb(122, 160, 211)";
       /* ------------------------------------------------------------------------------------ */
 
       const svg = d3.select(svgElement);
@@ -83,13 +94,26 @@ function generateElements(jsonData) {
       render(inner, g);
 
       // Center the graph
-      const initialScale = 0.75;
-      svg.call(zoom.transform, d3.zoomIdentity.translate((svg.attr("width") - g.graph().width * initialScale) / 2, 20).scale(initialScale));
+      const initialScale = 1;
+      const graph = g.graph();
+      const containerWidth = svg.node().parentElement.clientWidth;
 
-      svg.attr("height", g.graph().height * initialScale + 40);
+      // Calculate the available width for the graph
+      const graphWidth = graph.width * initialScale;
+      const centerX = Math.max(0, (containerWidth - graphWidth) / 2);
+      const centerY = 20; // Keep a small top margin
+
+      // Apply the transform with the new center calculation
+      svg.call(zoom.transform, d3.zoomIdentity.translate(centerX, centerY).scale(initialScale));
+
+      // Set the height to fit the graph with some padding
+      svg.attr("height", graph.height * initialScale + 40);
+
+      // Ensure the container is properly sized
+      svg.node().parentElement.style.overflow = "visible";
     } catch (error) {
       console.error("Error rendering graph:", error);
-      document.getElementById("console").innerText = "Error: " + error.message;
+      document.getElementById("console").innerText += "\nError: " + error.message;
     }
   }
 }

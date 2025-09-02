@@ -15,6 +15,7 @@
 
 body {
   padding: 0;
+  margin: 0;
   color: var(--vscode-foreground);
   font-size: var(--vscode-font-size);
   font-weight: var(--vscode-font-weight);
@@ -147,21 +148,28 @@ main {
   width: 100% !important;
   height: auto !important;
   max-width: none !important;
-  min-height: 400px !important;
+  min-height: 100px !important;
   display: block;
   margin: 0 auto;
-  border: 1px solid var(--bb-box-title-background);
 }
 .node rect {
   fill: #ffffff;
-  color: aqua;
+}
+.node text {
+  fill: #333333;
+  font-weight: bold;
+}
+.initial-state rect {
+  fill: #9ef7ff !important;
 }
 .edgePath path {
   fill: #ffffff;
   stroke: #ffffff;
 }
-.edgeLabel {
+.edgeLabel text {
   fill: #ffffff;
+  stroke: #000000;
+  stroke-width: 0.2px;
 }
 /* ------------------------------------------------------------------------------------ */
 #console {

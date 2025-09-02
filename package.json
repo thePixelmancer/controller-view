@@ -1,8 +1,8 @@
 {
   "name": "controller-view",
-  "displayName": "Animation Controller Graph Viewer",
+  "displayName": "Animation Controller Graph Preview",
   "description": "Visual graph viewer for Minecraft Bedrock animation controller files",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "Pixelmancer",
   "icon": "images/icon.png",
   "engines": {

@@ -6,11 +6,11 @@
         "default": {
           "animations": ["idle_base"],
           "transitions": [
-            { "attacka": "v.attack_time >= 0" }
+            { "attack": "v.attack_time >= 0" }
           ],
           "blend_transition": 0.2
         },
-        "attacka": {
+        "attack": {
           "animations": ["idle_base", "attack_acid"],
           "transitions": [{ "default": "query.test1" }],
           "blend_transition": 0
