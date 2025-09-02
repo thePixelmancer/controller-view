@@ -78,6 +78,12 @@ MIT License - see LICENSE.md for details
 
 ## Version History
 
+### 1.1.0
+- Rewrote the way graphs display using dagre D3
+- Graphs can now be zoomed in and out
+- Slightly better styling
+- Error messages appear in the graph
+
 ### 1.0.1
 - Current release with improved stability and performance
 
