@@ -37,19 +37,64 @@ function activate(context) {
     }
   };
 
-  const postUpdate = (panel, document) => {
+  // Resolve which controller name contains a given cursor line.
+  // Mirrors the logic in script.js activeControllerName() so we can
+  // compare server-side without round-tripping to the webview.
+  const resolveActiveController = (json, cursorLine) => {
+    try {
+      const parsed = JSON.parse(json);
+      const names = Object.keys(parsed.animation_controllers || {});
+      if (names.length <= 1) return names[0] ?? null;
+
+      const lines = json.split("\n");
+      const keyLines = [];
+      for (const name of names) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(`"${escaped}"`);
+        for (let i = 0; i < lines.length; i++) {
+          if (re.test(lines[i])) { keyLines.push({ name, line: i }); break; }
+        }
+      }
+      keyLines.sort((a, b) => a.line - b.line);
+      let active = keyLines[0]?.name ?? names[0];
+      for (const { name, line } of keyLines) {
+        if (line <= cursorLine) active = name;
+      }
+      return active;
+    } catch {
+      return null;
+    }
+  };
+
+  // Track last-sent state so we only post when something meaningful changed.
+  let lastSentJson            = null;
+  let lastSentControllerName  = null;
+
+  const postUpdate = (panel, document, force = false) => {
     const editor = vscode.window.activeTextEditor;
     const cursorLine = (editor && editor.document === document)
       ? editor.selection.active.line
       : 0;
-    panel.webview.postMessage({
-      type: "update",
-      json: document.getText(),
-      cursorLine,
-    });
+
+    const json            = document.getText();
+    const controllerName  = resolveActiveController(json, cursorLine);
+    const jsonChanged     = json !== lastSentJson;
+    const controllerChanged = controllerName !== lastSentControllerName;
+
+    // Skip the update if nothing the webview cares about has changed
+    if (!force && !jsonChanged && !controllerChanged) return;
+
+    lastSentJson           = json;
+    lastSentControllerName = controllerName;
+
+    panel.webview.postMessage({ type: "update", json, cursorLine });
   };
 
   const createPanel = (initialDocument) => {
+    // Reset tracking state for the new panel
+    lastSentJson           = null;
+    lastSentControllerName = null;
+
     const panel = vscode.window.createWebviewPanel(
       "controller-view",
       "Animation Controller Graph",
@@ -65,10 +110,10 @@ function activate(context) {
     panel.webview.html = getWebviewContent(panel.webview, context.extensionPath);
 
     if (initialDocument) {
-      postUpdate(panel, initialDocument);
+      postUpdate(panel, initialDocument, true); // force first paint
     }
 
-    // Update on document text changes
+    // Update on document text changes (always re-render)
     const changeSubscription = vscode.workspace.onDidChangeTextDocument(
       (event) => {
         if (isValidControllerFile(event.document)) {
@@ -77,7 +122,8 @@ function activate(context) {
       }
     );
 
-    // Re-send when the cursor moves so the active controller updates
+    // Update on cursor move — but postUpdate will no-op if the
+    // focused controller hasn't changed
     const selectionSubscription = vscode.window.onDidChangeTextEditorSelection(
       (event) => {
         if (isValidControllerFile(event.textEditor.document)) {

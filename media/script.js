@@ -626,6 +626,8 @@ function buildSymbolRow(prefix, name, info) {
 
 function loadController(jsonData, rawJson, cursorLine) {
   const controllersList = document.querySelector("#controllers");
+  // Disconnect any ResizeObservers from the previous render before clearing
+  controllersList.querySelectorAll("svg[data-ro]").forEach(s => s._roCleanup?.());
   controllersList.innerHTML = "";
   const consoleEl = document.getElementById("console");
   consoleEl.innerText = "";
@@ -759,10 +761,25 @@ function loadController(jsonData, rawJson, cursorLine) {
       });
 
       const graph = g.graph();
-      const cx = Math.max(0, (svgEl.parentElement.clientWidth - graph.width) / 2);
-      svg.call(zoom.transform, d3.zoomIdentity.translate(cx, 16));
-      svg.attr("height", graph.height + 40);
-      svgEl.parentElement.style.overflow = "visible";
+
+      // Centre the graph in whatever space the SVG currently occupies.
+      // Called once now, and again whenever the panel is resized.
+      function centreGraph() {
+        const w = svgEl.clientWidth  || svgEl.parentElement.clientWidth;
+        const h = svgEl.clientHeight || svgEl.parentElement.clientHeight;
+        const cx = Math.max(0, (w - graph.width)  / 2);
+        const cy = Math.max(0, (h - graph.height) / 2);
+        svg.call(zoom.transform, d3.zoomIdentity.translate(cx, cy));
+      }
+
+      centreGraph();
+
+      // Re-centre when the container is resized (panel drag, window resize)
+      const ro = new ResizeObserver(() => centreGraph());
+      ro.observe(svgEl.parentElement);
+
+      // Clean up observer if the panel is rebuilt (next loadController call)
+      svgEl._roCleanup = () => ro.disconnect();
 
       const sim = new SimController(controllerName, controllerData);
       sim._svgInner = inner;
