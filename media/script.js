@@ -2,7 +2,7 @@ window.addEventListener("message", (event) => {
   const message = event.data;
   if (message.type === "update") {
     try {
-      generateElements(JSON.parse(message.json));
+      loadController(JSON.parse(message.json));
     } catch (error) {
       showConsoleError("Failed to parse JSON: " + error.message);
     }
@@ -14,6 +14,10 @@ window.addEventListener("message", (event) => {
 function showConsoleError(msg) {
   document.getElementById("console").innerText += "\nError: " + msg;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Helpers
+═══════════════════════════════════════════════════════════════════════════ */
 
 function getAnimationLabel(anim) {
   if (typeof anim === "string") return anim;
@@ -45,19 +49,302 @@ function isNegatedCondition(c) {
   return typeof c === "string" && c.trim().startsWith("!");
 }
 
-/* ── CSS variable reader ─────────────────────────────────────────────────
-   dagre-d3 only accepts inline style strings for edge colours, so we
-   resolve the CSS custom properties at render time from the computed style
-   of the document root. This ensures edges match whatever VS Code theme
-   is active, including high-contrast and light themes.
-─────────────────────────────────────────────────────────────────────────── */
 function getCSSVar(name) {
-  return getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-/* ── Tooltip ─────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Molang → JS translator
+═══════════════════════════════════════════════════════════════════════════ */
+
+function molangToJS(expr) {
+  return expr
+    .trim()
+    .replace(/\bquery\./g, "q.")
+    .replace(/\bq\.([a-zA-Z_][a-zA-Z0-9_]*)/g, '_q["$1"]')
+    .replace(/\bv\.([a-zA-Z_][a-zA-Z0-9_]*)/g, '_v["$1"]')
+    .replace(/(?<![=!<>])=(?!=)/g, "==")
+    .replace(/;$/, "");
+}
+
+function evalCondition(expr, queries, variables) {
+  if (!expr || expr.trim() === "") return false;
+  try {
+    const js = molangToJS(String(expr));
+    // eslint-disable-next-line no-new-func
+    const fn = new Function("_q", "_v", `"use strict"; return !!(${js});`);
+    return fn(queries, variables);
+  } catch {
+    return false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Type inference
+   ─────────────────────────────────────────────────────────────────────────
+   We scan every expression each symbol appears in and collect a set of
+   "usage kinds":
+     boolean  — symbol appears bare, negated (!q.x), or in a logical chain
+                without any numeric/string comparison
+     numeric  — symbol appears in >, <, >=, <=, or compared to a number
+                literal, or used in arithmetic (+, -, *, /)
+     string   — symbol is compared (== / !=) to a quoted string literal
+
+   Rules:
+     • A symbol with only one kind → that type
+     • boolean + numeric → numeric  (0/non-zero is fine JS, no conflict)
+     • boolean + string  → string   (falsy empty string is fine, no conflict)
+     • numeric + string  → CONFLICT (can't be both a number and a string)
+     • all three         → CONFLICT
+═══════════════════════════════════════════════════════════════════════════ */
+
+// Patterns that indicate a numeric context for a captured symbol placeholder PH
+const NUMERIC_CTX_RE  = /PH\s*(?:[><!]=?|==)\s*-?\d[\d.]*|-?\d[\d.]*\s*(?:[><!]=?|==)\s*PH|PH\s*[+\-*/]|-?\d[\d.]*\s*[+\-*/]\s*PH/;
+// Symbol is compared to a quoted string
+const STRING_CTX_RE   = /PH\s*[!=]=\s*['"]|['"]\s*[!=]=\s*PH/;
+
+/**
+ * Given a single Molang expression and a symbol placeholder string,
+ * returns the set of kinds {'boolean','numeric','string'} detected.
+ */
+function kindsInExpr(expr, placeholder) {
+  const js = molangToJS(String(expr));
+  const kinds = new Set();
+
+  if (NUMERIC_CTX_RE.test(js.replace(/PH/g, "_X_").replace(new RegExp(escapeRegExp(placeholder), "g"), "PH"))) {
+    kinds.add("numeric");
+  }
+  if (STRING_CTX_RE.test(js.replace(/PH/g, "_X_").replace(new RegExp(escapeRegExp(placeholder), "g"), "PH"))) {
+    kinds.add("string");
+  }
+  // If neither numeric nor string context found, the symbol is used as boolean
+  if (kinds.size === 0) kinds.add("boolean");
+
+  return kinds;
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Collapse a set of all observed kinds into a single inferred type + conflict flag.
+ * Returns { type: 'boolean'|'numeric'|'string', conflict: bool, kinds: Set }
+ */
+function resolveType(allKinds) {
+  const has = (k) => allKinds.has(k);
+  if (has("numeric") && has("string")) {
+    return { type: "numeric", conflict: true, kinds: allKinds };
+  }
+  if (has("numeric")) return { type: "numeric",  conflict: false, kinds: allKinds };
+  if (has("string"))  return { type: "string",   conflict: false, kinds: allKinds };
+  return               { type: "boolean",  conflict: false, kinds: allKinds };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Symbol extraction + type inference
+   Returns:
+     queries:   Map<name, {type, conflict, kinds}>
+     variables: Map<name, {type, conflict, kinds}>
+     conflicts: string[]   — human-readable conflict descriptions
+═══════════════════════════════════════════════════════════════════════════ */
+
+function extractSymbols(animControllers) {
+  // Map from name → Set of kind strings seen across all expressions
+  const qKinds = new Map(); // q.*
+  const vKinds = new Map(); // v.*
+
+  const Q_RE = /\b(?:q\.|query\.)([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const V_RE = /\bv\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+
+  function scanExpr(expr) {
+    if (typeof expr !== "string") return;
+
+    // Discover symbol names first
+    const qNames = [...expr.matchAll(Q_RE)].map(m => m[1]);
+    const vNames = [...expr.matchAll(V_RE)].map(m => m[1]);
+
+    for (const name of qNames) {
+      if (!qKinds.has(name)) qKinds.set(name, new Set());
+      const placeholder = `_q["${name}"]`;
+      const kinds = kindsInExpr(expr, placeholder);
+      for (const k of kinds) qKinds.get(name).add(k);
+    }
+    for (const name of vNames) {
+      if (!vKinds.has(name)) vKinds.set(name, new Set());
+      const placeholder = `_v["${name}"]`;
+      const kinds = kindsInExpr(expr, placeholder);
+      for (const k of kinds) vKinds.get(name).add(k);
+    }
+  }
+
+  for (const ctrl of Object.values(animControllers)) {
+    for (const state of Object.values(ctrl.states || {})) {
+      for (const t of state.transitions || [])
+        for (const cond of Object.values(t)) scanExpr(cond);
+      for (const a of state.animations || [])
+        if (typeof a === "object") Object.values(a).forEach(scanExpr);
+      for (const e of [...(state.on_entry || []), ...(state.on_exit || [])]) scanExpr(e);
+    }
+  }
+
+  // Build result maps
+  const queries   = new Map();
+  const variables = new Map();
+  const conflicts = [];
+
+  for (const [name, kinds] of [...qKinds.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const info = resolveType(kinds);
+    queries.set(name, info);
+    if (info.conflict) {
+      conflicts.push(
+        `q.${name} is used as both numeric and string — treating as numeric. ` +
+        `Check expressions comparing it to a string literal.`
+      );
+    }
+  }
+  for (const [name, kinds] of [...vKinds.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const info = resolveType(kinds);
+    variables.set(name, info);
+    if (info.conflict) {
+      conflicts.push(
+        `v.${name} is used as both numeric and string — treating as numeric. ` +
+        `Check expressions comparing it to a string literal.`
+      );
+    }
+  }
+
+  return { queries, variables, conflicts };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Simulation engine
+═══════════════════════════════════════════════════════════════════════════ */
+
+class SimController {
+  constructor(name, data) {
+    this.name         = name;
+    this.data         = data;
+    this.initialState = data.initial_state || "default";
+    this.currentState = this.initialState;
+    this._svgInner    = null;
+    this._graph       = null;
+  }
+
+  reset() { this.currentState = this.initialState; }
+
+  tick(queries, variables) {
+    const stateData = this.data.states?.[this.currentState];
+    if (!stateData) return false;
+    for (const t of stateData.transitions || []) {
+      for (const [target, cond] of Object.entries(t)) {
+        if (evalCondition(cond, queries, variables) && target !== this.currentState) {
+          this.currentState = target;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  repaint() {
+    if (!this._svgInner) return;
+    this._svgInner.selectAll("g.node").each(function() {
+      d3.select(this).classed("sim-active", false).classed("sim-inactive", false);
+    });
+    this._svgInner.selectAll("g.node").each((stateName, i, nodes) => {
+      d3.select(nodes[i]).classed(
+        stateName === this.currentState ? "sim-active" : "sim-inactive", true
+      );
+    });
+  }
+
+  clearPaint() {
+    if (!this._svgInner) return;
+    this._svgInner.selectAll("g.node")
+      .classed("sim-active", false).classed("sim-inactive", false);
+  }
+}
+
+class SimEngine {
+  constructor() {
+    this.controllers = [];
+    this.queries     = {};
+    this.variables   = {};
+    this.running     = false;
+    this._interval   = null;
+    this._tickMs     = 100;
+    this._onChange   = null;
+  }
+
+  setControllers(cs) { this.controllers = cs; }
+
+  initSymbols(queries, variables) {
+    const prevQ = { ...this.queries };
+    const prevV = { ...this.variables };
+    this.queries   = {};
+    this.variables = {};
+    for (const [name, info] of queries) {
+      const prev = prevQ[name];
+      if (prev !== undefined) {
+        this.queries[name] = prev; // preserve across re-parses
+      } else {
+        this.queries[name] = info.type === "numeric" ? 0
+                           : info.type === "string"  ? ""
+                           : false;
+      }
+    }
+    for (const [name, info] of variables) {
+      const prev = prevV[name];
+      if (prev !== undefined) {
+        this.variables[name] = prev;
+      } else {
+        this.variables[name] = info.type === "numeric" ? 0
+                             : info.type === "string"  ? ""
+                             : false;
+      }
+    }
+  }
+
+  setQuery(name, value)    { this.queries[name]   = value; this._tick(); }
+  setVariable(name, value) { this.variables[name] = value; this._tick(); }
+
+  play() {
+    if (this.running) return;
+    this.running   = true;
+    this._interval = setInterval(() => this._tick(), this._tickMs);
+  }
+
+  pause() {
+    this.running = false;
+    clearInterval(this._interval);
+    this._interval = null;
+  }
+
+  reset() {
+    this.pause();
+    for (const c of this.controllers) { c.reset(); c.repaint(); }
+    if (this._onChange) this._onChange();
+  }
+
+  activateSim()   { for (const c of this.controllers) c.repaint(); }
+  deactivateSim() { for (const c of this.controllers) c.clearPaint(); }
+
+  _tick() {
+    let changed = false;
+    for (const c of this.controllers) {
+      if (c.tick(this.queries, this.variables)) changed = true;
+      c.repaint();
+    }
+    if (changed && this._onChange) this._onChange();
+  }
+}
+
+const SIM = new SimEngine();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tooltip
+═══════════════════════════════════════════════════════════════════════════ */
 
 let _tooltip = null;
 let _tooltipTimer = null;
@@ -89,19 +376,16 @@ function showTooltip(groups, x, y) {
   t.classList.remove("visible");
   t.style.display = "block";
   positionTooltip(x, y);
-  // Force reflow then fade in
   requestAnimationFrame(() => t.classList.add("visible"));
 }
 
 function positionTooltip(x, y) {
   const t = getTooltip();
   const margin = 14;
-  const tw = t.offsetWidth;
-  const th = t.offsetHeight;
   let left = x + margin;
   let top  = y + margin;
-  if (left + tw > window.innerWidth)  left = x - tw - margin;
-  if (top  + th > window.innerHeight) top  = y - th - margin;
+  if (left + t.offsetWidth  > window.innerWidth)  left = x - t.offsetWidth  - margin;
+  if (top  + t.offsetHeight > window.innerHeight) top  = y - t.offsetHeight - margin;
   t.style.left = left + "px";
   t.style.top  = top  + "px";
 }
@@ -109,14 +393,203 @@ function positionTooltip(x, y) {
 function hideTooltip() {
   if (!_tooltip) return;
   _tooltip.classList.remove("visible");
-  _tooltipTimer = setTimeout(() => {
-    if (_tooltip) _tooltip.style.display = "none";
-  }, 100);
+  _tooltipTimer = setTimeout(() => { if (_tooltip) _tooltip.style.display = "none"; }, 100);
 }
 
-/* ── Main renderer ───────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Simulator panel UI
+═══════════════════════════════════════════════════════════════════════════ */
 
-function generateElements(jsonData) {
+function buildSimPanel(queries, variables, conflicts) {
+  const panel = document.getElementById("sim-panel");
+  panel.innerHTML = "";
+
+  // ── Header ──────────────────────────────────────────────────────────────
+  const header = document.createElement("div");
+  header.className = "sim-header";
+
+  const title = document.createElement("span");
+  title.className = "sim-title";
+  title.textContent = "Simulator";
+  header.appendChild(title);
+
+  const controls = document.createElement("div");
+  controls.className = "sim-controls";
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "sim-btn";
+  resetBtn.title = "Reset to initial state";
+  resetBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg> Reset`;
+  resetBtn.addEventListener("click", () => { SIM.reset(); updateSimStatus(); });
+
+  const playBtn = document.createElement("button");
+  playBtn.className = "sim-btn sim-btn-primary";
+  playBtn.id = "sim-play-btn";
+  playBtn.innerHTML = playBtnHTML(false);
+  playBtn.addEventListener("click", () => {
+    SIM.running ? SIM.pause() : SIM.play();
+    playBtn.innerHTML = playBtnHTML(SIM.running);
+    playBtn.classList.toggle("sim-btn-active", SIM.running);
+  });
+
+  controls.appendChild(resetBtn);
+  controls.appendChild(playBtn);
+  header.appendChild(controls);
+  panel.appendChild(header);
+
+  const hasAnything = queries.size > 0 || variables.size > 0;
+
+  if (!hasAnything) {
+    const empty = document.createElement("div");
+    empty.className = "sim-empty";
+    empty.textContent = "No queries or variables found in this file.";
+    panel.appendChild(empty);
+    return;
+  }
+
+  // ── Conflict warnings ───────────────────────────────────────────────────
+  if (conflicts.length > 0) {
+    const warnBox = document.createElement("div");
+    warnBox.className = "sim-conflicts";
+    warnBox.innerHTML = conflicts.map(c =>
+      `<div class="sim-conflict-row">
+        <svg class="sim-conflict-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+        </svg>
+        ${c}
+      </div>`
+    ).join("");
+    panel.appendChild(warnBox);
+  }
+
+  // ── Status bar ──────────────────────────────────────────────────────────
+  const status = document.createElement("div");
+  status.className = "sim-status";
+  status.id = "sim-status";
+  panel.appendChild(status);
+  updateSimStatus();
+
+  // ── Symbol grid ─────────────────────────────────────────────────────────
+  const grid = document.createElement("div");
+  grid.className = "sim-grid";
+
+  if (queries.size > 0) {
+    const h = document.createElement("div");
+    h.className = "sim-group-label";
+    h.textContent = "Queries";
+    grid.appendChild(h);
+    for (const [name, info] of queries) grid.appendChild(buildSymbolRow("q", name, info));
+  }
+
+  if (variables.size > 0) {
+    const h = document.createElement("div");
+    h.className = "sim-group-label";
+    h.textContent = "Variables";
+    grid.appendChild(h);
+    for (const [name, info] of variables) grid.appendChild(buildSymbolRow("v", name, info));
+  }
+
+  panel.appendChild(grid);
+}
+
+function playBtnHTML(playing) {
+  return playing
+    ? `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5z"/></svg> Pause`
+    : `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg> Play`;
+}
+
+function updateSimStatus() {
+  const el = document.getElementById("sim-status");
+  if (!el) return;
+  el.innerHTML = SIM.controllers.map(c => {
+    const label = SIM.controllers.length > 1
+      ? `<span class="sim-status-ctrl">${c.name.replace("controller.animation.", "")}</span>: `
+      : "";
+    return `${label}<span class="sim-status-state">${c.currentState}</span>`;
+  }).join("  ·  ");
+}
+
+/**
+ * Build one symbol row. The input widget depends on inferred type:
+ *   boolean  → pill toggle (false/true)
+ *   numeric  → number input
+ *   string   → text input
+ *   conflict → number input + warning badge (already warned in conflicts box)
+ */
+function buildSymbolRow(prefix, name, info) {
+  const store = prefix === "q" ? SIM.queries : SIM.variables;
+  const { type, conflict } = info;
+
+  const row = document.createElement("div");
+  row.className = "sim-row";
+
+  // Label
+  const label = document.createElement("label");
+  label.className = "sim-label";
+  label.title = `${prefix}.${name}  [inferred: ${type}${conflict ? " ⚠ conflict" : ""}]`;
+  label.textContent = `${prefix}.${name}`;
+  if (conflict) label.classList.add("sim-label-conflict");
+
+  // Type badge
+  const badge = document.createElement("span");
+  badge.className = `sim-type-badge sim-type-${type}${conflict ? " sim-type-conflict" : ""}`;
+  badge.textContent = conflict ? "⚠ " + type : type;
+
+  const inputWrap = document.createElement("div");
+  inputWrap.className = "sim-input-wrap";
+
+  if (type === "boolean") {
+    const val = !!store[name];
+    const toggle = document.createElement("button");
+    toggle.className = "sim-toggle" + (val ? " sim-toggle-on" : "");
+    toggle.textContent = val ? "true" : "false";
+    toggle.addEventListener("click", () => {
+      const next = !store[name];
+      prefix === "q" ? SIM.setQuery(name, next) : SIM.setVariable(name, next);
+      toggle.textContent = next ? "true" : "false";
+      toggle.classList.toggle("sim-toggle-on", next);
+      updateSimStatus();
+    });
+    inputWrap.appendChild(toggle);
+
+  } else if (type === "numeric") {
+    const input = document.createElement("input");
+    input.type      = "number";
+    input.className = "sim-number";
+    input.value     = store[name] ?? 0;
+    input.step      = "0.1";
+    input.addEventListener("input", () => {
+      const v = parseFloat(input.value);
+      prefix === "q" ? SIM.setQuery(name, isNaN(v) ? 0 : v) : SIM.setVariable(name, isNaN(v) ? 0 : v);
+      updateSimStatus();
+    });
+    inputWrap.appendChild(input);
+
+  } else {
+    // string
+    const input = document.createElement("input");
+    input.type      = "text";
+    input.className = "sim-text";
+    input.value     = store[name] ?? "";
+    input.placeholder = '""';
+    input.addEventListener("input", () => {
+      prefix === "q" ? SIM.setQuery(name, input.value) : SIM.setVariable(name, input.value);
+      updateSimStatus();
+    });
+    inputWrap.appendChild(input);
+  }
+
+  row.appendChild(label);
+  row.appendChild(badge);
+  row.appendChild(inputWrap);
+  return row;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Main renderer
+═══════════════════════════════════════════════════════════════════════════ */
+
+function loadController(jsonData) {
   const controllersList = document.querySelector("#controllers");
   controllersList.innerHTML = "";
   const consoleEl = document.getElementById("console");
@@ -128,32 +601,39 @@ function generateElements(jsonData) {
     return;
   }
 
-  // Read theme colours once per render pass
-  const edgeColor    = getCSSVar("--cv-edge")    || "#75beff";
-  const edgeNegColor = getCSSVar("--cv-edge-neg") || "#cca700";
-  const bgColor      = getCSSVar("--cv-bg")       || "transparent";
+  SIM.pause();
+  const playBtn = document.getElementById("sim-play-btn");
+  if (playBtn) { playBtn.innerHTML = playBtnHTML(false); playBtn.classList.remove("sim-btn-active"); }
+
+  const { queries, variables, conflicts } = extractSymbols(animControllers);
+  SIM.initSymbols(queries, variables);
+
+  buildSimPanel(queries, variables, conflicts);
+  SIM._onChange = updateSimStatus;
+
+  // Surface conflicts in the error console too
+  for (const c of conflicts) showConsoleError("Type conflict: " + c);
+
+  const edgeColor      = getCSSVar("--cv-edge")       || "#75beff";
+  const edgeNegColor   = getCSSVar("--cv-edge-neg")   || "#cca700";
   const edgeLabelColor = getCSSVar("--cv-edge-label") || getCSSVar("--cv-fg") || "#cccccc";
 
-  for (const controllerName of Object.keys(animControllers)) {
-    const controllerData = animControllers[controllerName];
+  const simControllers = [];
+
+  for (const [controllerName, controllerData] of Object.entries(animControllers)) {
     const states = controllerData?.states;
 
-    // Card shell
-    const li = document.createElement("li");
-
+    const li     = document.createElement("li");
     const header = document.createElement("div");
     header.className = "card-header";
     header.innerHTML = `<h2>${controllerName}</h2>`;
-
     const body = document.createElement("div");
     body.className = "card-body";
-
     const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svgEl.setAttribute("width", "100%");
     svgEl.setAttribute("height", "0");
     svgEl.style.display = "block";
     svgEl.innerHTML = "<g></g>";
-
     body.appendChild(svgEl);
     li.appendChild(header);
     li.appendChild(body);
@@ -166,41 +646,27 @@ function generateElements(jsonData) {
 
     try {
       const g = new dagreD3.graphlib.Graph().setGraph({
-        rankdir: "TB",
-        edgesep: 20,
-        ranksep: 55,
-        nodesep: 35,
+        rankdir: "TB", edgesep: 20, ranksep: 55, nodesep: 35,
       });
 
       const initialState = controllerData.initial_state || "default";
-      const stateKeys = Object.keys(states);
+      const stateKeys    = Object.keys(states);
 
-      if (!stateKeys.includes(initialState)) {
+      if (!stateKeys.includes(initialState))
         throw new Error(`Initial state [${initialState}] not found in controller [${controllerName}]!`);
-      }
 
-      // ── Nodes ──────────────────────────────────────────────────────────
       stateKeys.forEach((state) => {
         const sd = states[state];
         const animLines     = (sd?.animations      || []).map(getAnimationLabel);
-        const particleLines = (sd?.particle_effects || []).map(p =>
-          p.locator ? `${p.effect} @ ${p.locator}` : p.effect);
-        const soundLines    = (sd?.sound_effects    || []).map(s =>
-          s.locator ? `${s.effect} @ ${s.locator}` : s.effect);
+        const particleLines = (sd?.particle_effects || []).map(p => p.locator ? `${p.effect} @ ${p.locator}` : p.effect);
+        const soundLines    = (sd?.sound_effects    || []).map(s => s.locator ? `${s.effect} @ ${s.locator}` : s.effect);
         const onEntryLines  = (sd?.on_entry || []).map(String);
         const onExitLines   = (sd?.on_exit  || []).map(String);
-
-        const hasTooltip = animLines.length > 0 || particleLines.length > 0 ||
-                           soundLines.length > 0 || onEntryLines.length > 0 || onExitLines.length > 0;
+        const hasTooltip    = [animLines, particleLines, soundLines, onEntryLines, onExitLines].some(a => a.length > 0);
 
         g.setNode(state, {
-          label: state,
-          rx: 3,
-          ry: 3,
-          class: [
-            state === initialState ? "initial-state" : "",
-            hasTooltip ? "has-tooltip" : "",
-          ].filter(Boolean).join(" "),
+          label: state, rx: 3, ry: 3,
+          class: [state === initialState ? "initial-state" : "", hasTooltip ? "has-tooltip" : ""].filter(Boolean).join(" "),
           _tooltipGroups: hasTooltip ? [
             { label: "On Entry",         items: onEntryLines },
             { label: "Animations",       items: animLines },
@@ -211,24 +677,20 @@ function generateElements(jsonData) {
         });
       });
 
-      // ── Edges ──────────────────────────────────────────────────────────
       stateKeys.forEach((state) => {
         const transitions = states[state]?.transitions;
         if (!Array.isArray(transitions)) return;
-
         transitions.forEach((transition) => {
           if (!transition || typeof transition !== "object") return;
           Object.entries(transition).forEach(([target, condition]) => {
-            if (!stateKeys.includes(target)) {
+            if (!stateKeys.includes(target))
               consoleEl.innerText += `\nWarning: Transition target [${target}] not found in [${controllerName}].`;
-            }
             const neg = isNegatedCondition(condition);
             const color = neg ? edgeNegColor : edgeColor;
             try {
               g.setEdge(state, target, {
                 label: wrapLabel(String(condition)),
-                curve: d3.curveBasis,
-                labelPos: "c",
+                curve: d3.curveBasis, labelPos: "c",
                 style: `fill: none; stroke: ${color}; stroke-width: 1.5px;`,
                 arrowheadStyle: `fill: ${color};`,
                 labelStyle: `fill: ${edgeLabelColor}; font-size: 10.5px;`,
@@ -240,16 +702,12 @@ function generateElements(jsonData) {
         });
       });
 
-      // ── Render ─────────────────────────────────────────────────────────
       const svg   = d3.select(svgEl);
       const inner = svg.select("g");
-
-      const zoom = d3.zoom().on("zoom", () => inner.attr("transform", d3.event.transform));
+      const zoom  = d3.zoom().on("zoom", () => inner.attr("transform", d3.event.transform));
       svg.call(zoom);
-
       new dagreD3.render()(inner, g);
 
-      // Tooltip listeners (post-render, so DOM nodes exist)
       inner.selectAll("g.node").each(function(stateName) {
         const groups = g.node(stateName)?._tooltipGroups;
         if (!groups) return;
@@ -258,17 +716,24 @@ function generateElements(jsonData) {
         this.addEventListener("mouseleave", ()  => hideTooltip());
       });
 
-      // Centre and resize
       const graph = g.graph();
-      const containerW = svgEl.parentElement.clientWidth;
-      const cx = Math.max(0, (containerW - graph.width) / 2);
+      const cx = Math.max(0, (svgEl.parentElement.clientWidth - graph.width) / 2);
       svg.call(zoom.transform, d3.zoomIdentity.translate(cx, 16));
       svg.attr("height", graph.height + 40);
       svgEl.parentElement.style.overflow = "visible";
+
+      const sim = new SimController(controllerName, controllerData);
+      sim._svgInner = inner;
+      sim._graph    = g;
+      simControllers.push(sim);
 
     } catch (err) {
       console.error(err);
       consoleEl.innerText += "\nError: " + err.message;
     }
   }
+
+  SIM.setControllers(simControllers);
+  SIM.activateSim();
+  updateSimStatus();
 }

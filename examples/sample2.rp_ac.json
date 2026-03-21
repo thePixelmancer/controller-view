@@ -8,7 +8,7 @@
             "idle_base"
           ],
           "transitions": [ 
-            { "attack": "q.is_chddddddarged"},
+            { "attack": "q.is_charged"},
             { "summon": "q.is_casting"}
           ],
           "blend_transition": 0.2

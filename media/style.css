@@ -333,3 +333,353 @@ main {
 #console:empty {
   display: none;
 }
+
+/* ── Simulation: active / inactive node states ───────────────────────────── */
+
+.node.sim-active rect {
+  stroke-width: 2.5px !important;
+  filter: drop-shadow(0 0 6px var(--cv-sim-active-glow));
+}
+
+.node.sim-active text {
+  font-weight: 700 !important;
+}
+
+.node.sim-inactive rect {
+  opacity: 0.35;
+}
+
+.node.sim-inactive text {
+  opacity: 0.35;
+}
+
+/* ── Simulator panel ─────────────────────────────────────────────────────── */
+
+:root {
+  --cv-sim-active-glow: var(--vscode-terminal-ansiGreen, #4ec9b0);
+  --cv-sim-btn-bg:      var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
+  --cv-sim-btn-fg:      var(--vscode-button-secondaryForeground, var(--cv-fg));
+  --cv-sim-btn-hover:   var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
+  --cv-sim-primary-bg:  var(--vscode-button-background,      #0078d4);
+  --cv-sim-primary-fg:  var(--vscode-button-foreground,      #ffffff);
+  --cv-sim-primary-hover: var(--vscode-button-hoverBackground, #006cbd);
+  --cv-sim-toggle-off:  var(--vscode-input-background,       rgba(128,128,128,0.15));
+  --cv-sim-toggle-on:   var(--vscode-terminal-ansiGreen,     #4ec9b0);
+  --cv-sim-toggle-on-fg: var(--vscode-terminal-background,   #000);
+  --cv-input-bg:        var(--vscode-input-background,       rgba(0,0,0,0.2));
+  --cv-input-border:    var(--vscode-input-border,           var(--cv-divider));
+  --cv-input-fg:        var(--vscode-input-foreground,       var(--cv-fg));
+}
+
+.sim-panel {
+  background: var(--cv-card-bg);
+  border: 1px solid var(--cv-card-border);
+  border-radius: var(--cv-radius);
+  overflow: hidden;
+}
+
+/* Header */
+.sim-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px var(--cv-padding);
+  border-bottom: 1px solid var(--cv-divider);
+  background: var(--vscode-sideBarSectionHeader-background, transparent);
+  gap: 8px;
+}
+
+.sim-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vscode-sideBarSectionHeader-foreground, var(--cv-fg-muted));
+}
+
+.sim-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sim-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-weight: 500;
+  border: 1px solid var(--cv-card-border);
+  border-radius: var(--cv-radius);
+  background: var(--cv-sim-btn-bg);
+  color: var(--cv-sim-btn-fg);
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.sim-btn:hover {
+  background: var(--cv-sim-btn-hover);
+}
+
+.sim-btn-primary {
+  background: var(--cv-sim-primary-bg);
+  color: var(--cv-sim-primary-fg);
+  border-color: transparent;
+}
+
+.sim-btn-primary:hover {
+  background: var(--cv-sim-primary-hover);
+}
+
+.sim-btn-active {
+  background: var(--cv-sim-primary-hover) !important;
+}
+
+/* Status bar */
+.sim-status {
+  padding: 5px var(--cv-padding);
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--cv-fg-muted);
+  border-bottom: 1px solid var(--cv-divider);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+}
+
+.sim-status-ctrl {
+  opacity: 0.6;
+  font-size: 10px;
+}
+
+.sim-status-state {
+  color: var(--cv-sim-toggle-on);
+  font-weight: 600;
+}
+
+/* Symbol grid */
+.sim-grid {
+  padding: 8px var(--cv-padding);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.sim-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cv-fg-subtle);
+  opacity: 0.7;
+  padding: 8px 0 4px 0;
+  border-bottom: 1px solid var(--cv-divider);
+  margin-bottom: 2px;
+}
+
+.sim-group-label:first-child {
+  padding-top: 2px;
+}
+
+.sim-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  gap: 12px;
+  border-bottom: 1px solid transparent;
+}
+
+.sim-row:hover {
+  border-bottom-color: var(--cv-divider);
+}
+
+.sim-label {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11.5px;
+  color: var(--cv-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.sim-input-wrap {
+  flex-shrink: 0;
+}
+
+/* Boolean toggle */
+.sim-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  border-radius: 10px;
+  border: 1px solid var(--cv-input-border);
+  background: var(--cv-sim-toggle-off);
+  color: var(--cv-fg-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-weight: 500;
+}
+
+.sim-toggle:hover {
+  border-color: var(--vscode-focusBorder, var(--cv-input-border));
+}
+
+.sim-toggle.sim-toggle-on {
+  background: var(--cv-sim-toggle-on);
+  color: var(--cv-sim-toggle-on-fg);
+  border-color: transparent;
+}
+
+/* Number input */
+.sim-number {
+  width: 80px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  border: 1px solid var(--cv-input-border);
+  border-radius: var(--cv-radius);
+  background: var(--cv-input-bg);
+  color: var(--cv-input-fg);
+  text-align: right;
+  -moz-appearance: textfield;
+}
+
+.sim-number::-webkit-outer-spin-button,
+.sim-number::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.sim-number:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.sim-empty {
+  padding: 10px var(--cv-padding);
+  font-size: 11.5px;
+  color: var(--cv-fg-muted);
+  font-style: italic;
+}
+
+/* ── Type badges ─────────────────────────────────────────────────────────── */
+
+.sim-type-badge {
+  font-size: 9.5px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  opacity: 0.75;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  margin-right: 6px;
+}
+
+.sim-type-boolean {
+  background: color-mix(in srgb, var(--vscode-terminal-ansiBlue, #4fc3f7) 18%, transparent);
+  color: var(--vscode-terminal-ansiBlue, #4fc3f7);
+  border-color: color-mix(in srgb, var(--vscode-terminal-ansiBlue, #4fc3f7) 35%, transparent);
+}
+
+.sim-type-numeric {
+  background: color-mix(in srgb, var(--vscode-terminal-ansiMagenta, #ce93d8) 18%, transparent);
+  color: var(--vscode-terminal-ansiMagenta, #ce93d8);
+  border-color: color-mix(in srgb, var(--vscode-terminal-ansiMagenta, #ce93d8) 35%, transparent);
+}
+
+.sim-type-string {
+  background: color-mix(in srgb, var(--vscode-terminal-ansiYellow, #fff176) 18%, transparent);
+  color: var(--vscode-terminal-ansiYellow, #d4ac0d);
+  border-color: color-mix(in srgb, var(--vscode-terminal-ansiYellow, #d4ac0d) 35%, transparent);
+}
+
+.sim-type-conflict {
+  background: color-mix(in srgb, var(--cv-error, #f48771) 18%, transparent);
+  color: var(--cv-error, #f48771);
+  border-color: color-mix(in srgb, var(--cv-error, #f48771) 35%, transparent);
+  opacity: 1;
+}
+
+/* ── Conflict label tint ─────────────────────────────────────────────────── */
+
+.sim-label-conflict {
+  color: var(--cv-error, #f48771);
+  opacity: 0.85;
+}
+
+/* ── Conflict warning box ────────────────────────────────────────────────── */
+
+.sim-conflicts {
+  border-bottom: 1px solid var(--cv-divider);
+  padding: 6px var(--cv-padding);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-conflict-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--cv-error, #f48771);
+  line-height: 1.5;
+}
+
+.sim-conflict-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  fill: var(--cv-error, #f48771);
+}
+
+/* ── String text input ───────────────────────────────────────────────────── */
+
+.sim-text {
+  width: 110px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  border: 1px solid var(--cv-input-border);
+  border-radius: var(--cv-radius);
+  background: var(--cv-input-bg);
+  color: var(--cv-input-fg);
+}
+
+.sim-text:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* ── Row flex: label grows, badge fixed, input fixed ─────────────────────── */
+
+.sim-row {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  gap: 0;
+  border-bottom: 1px solid transparent;
+}
+
+.sim-row:hover {
+  border-bottom-color: var(--cv-divider);
+}
+
+.sim-label {
+  flex: 1;
+  min-width: 0;
+  margin-right: 4px;
+}
