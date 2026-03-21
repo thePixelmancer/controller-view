@@ -1,54 +1,257 @@
-html,
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
+* {
+  box-sizing: border-box;
+}
+:root {
+  --container-padding: 20px;
+  --input-padding-vertical: 6px;
+  --input-padding-horizontal: 4px;
+  --input-margin-vertical: 4px;
+  --input-margin-horizontal: 0;
+
+  --bb-background: #282b2d;
+  --bb-box-background: #212325;
+  --bb-box-title-background: #323638;
+
+  --edge-default: #ffffff;
+  --edge-negated: #f0a05a;
+  --node-fill: #ffffff;
+  --node-initial-fill: #9ef7ff;
+  --node-text: #1a1a1a;
+  --node-anim-text: #555555;
 }
 
-canvas {
-  display: block;
+body {
+  padding: 0;
+  margin: 0;
+  color: var(--vscode-foreground);
+  font-size: var(--vscode-font-size);
+  font-weight: var(--vscode-font-weight);
+  font-family: var(--vscode-font-family);
+  background-color: var(--bb-background);
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
+
+body > *,
+form > * {
+  margin-block-start: var(--input-margin-vertical);
+  margin-block-end: var(--input-margin-vertical);
+}
+
+*:focus {
+  outline-color: var(--vscode-focusBorder) !important;
+}
+
+a {
+  color: var(--vscode-textLink-foreground);
+}
+
+a:hover,
+a:active {
+  color: var(--vscode-textLink-activeForeground);
+}
+
+code {
+  font-size: var(--vscode-editor-font-size);
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* ------------------------------------------------------------------------------------ */
+
 main {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
-}
-.diagram-container {
   position: relative;
   width: 100%;
-  flex: 1;
+  height: 100%;
+  justify-content: flex-start;
+  padding: 20px;
 }
 
-.controls {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 10;
+main h1 {
+  margin: 0 0 20px 0;
+  padding: 0;
+  text-align: center;
+  font-size: 1.5em;
+  color: var(--vscode-foreground);
+}
+
+#controllers {
   display: flex;
-  gap: 10px;
-  padding: 10px;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  flex-direction: column;
+  gap: 2em;
+  list-style: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
-.controls button {
-  padding: 8px 16px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s ease;
+#controllers li {
+  background: var(--bb-box-background);
+  width: 100%;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--bb-box-title-background);
+  list-style: none;
 }
 
-.controls button:hover {
-  background-color: #0056b3;
+#controllers li h2 {
+  margin: 0 0 15px 0;
+  padding: 0 0 10px 0;
+  color: var(--vscode-foreground);
+  font-size: 1.2em;
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 1px solid var(--bb-box-title-background);
 }
 
-.controls button:active {
-  background-color: #004085;
+#controllers li svg {
+  width: 100% !important;
+  height: auto !important;
+  max-width: none !important;
+  min-height: 100px !important;
+  display: block;
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Node styles */
+
+.node rect {
+  fill: var(--node-fill);
+  stroke: #cccccc;
+  stroke-width: 1px;
+}
+
+.node .node-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  min-width: 80px;
+}
+
+.node-state-name {
+  font-weight: bold;
+  font-size: 13px;
+  color: var(--node-text);
+  white-space: nowrap;
+}
+
+.node-anims {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+  gap: 2px;
+}
+
+.node-anims span {
+  font-size: 10px;
+  color: var(--node-anim-text);
+  background: #f0f0f0;
+  border-radius: 2px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.initial-state rect {
+  fill: var(--node-initial-fill) !important;
+  stroke: #40c8d8;
+}
+
+.initial-state .node-state-name {
+  color: #0a4a50;
+}
+
+.initial-state .node-anims span {
+  background: #c8f4f8;
+  color: #0a4a50;
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Edge styles */
+
+.edgePath path.path {
+  fill: none;
+  stroke: var(--edge-default);
+  stroke-width: 1.5px;
+}
+
+.edgeLabel {
+  background: transparent;
+}
+
+.edgeLabel text {
+  fill: var(--edge-default);
+  stroke: #000000;
+  stroke-width: 0.2px;
+  font-size: 11px;
+}
+
+/* Negated edges (.negated- class applied via dagre style, color controlled inline) */
+
+/* ------------------------------------------------------------------------------------ */
+/* Legend */
+
+.legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bb-box-background);
+  border: 1px solid var(--bb-box-title-background);
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  margin-bottom: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legend-swatch.default {
+  background: var(--edge-default);
+}
+
+.legend-swatch.negated {
+  background: var(--edge-negated);
+}
+
+.legend-node {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid #aaa;
+}
+
+.legend-node.initial {
+  background: var(--node-initial-fill);
+}
+
+.legend-node.normal {
+  background: var(--node-fill);
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Console */
+
+#console {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: monospace;
+  font-size: 12px;
+  color: #f08080;
+  margin-top: 12px;
+  white-space: pre-wrap;
 }

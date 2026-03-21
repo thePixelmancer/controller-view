@@ -11,6 +11,12 @@
   --bb-background: #282b2d;
   --bb-box-background: #212325;
   --bb-box-title-background: #323638;
+
+  --edge-default: #ffffff;
+  --edge-negated: #f0a05a;
+  --node-fill: #ffffff;
+  --node-initial-fill: #9ef7ff;
+  --node-text: #1a1a1a;
 }
 
 body {
@@ -21,6 +27,9 @@ body {
   font-weight: var(--vscode-font-weight);
   font-family: var(--vscode-font-family);
   background-color: var(--bb-background);
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 body > *,
@@ -33,81 +42,17 @@ form > * {
   outline-color: var(--vscode-focusBorder) !important;
 }
 
-a {
-  color: var(--vscode-textLink-foreground);
-}
-
-a:hover,
-a:active {
-  color: var(--vscode-textLink-activeForeground);
-}
+a { color: var(--vscode-textLink-foreground); }
+a:hover, a:active { color: var(--vscode-textLink-activeForeground); }
 
 code {
   font-size: var(--vscode-editor-font-size);
   font-family: var(--vscode-editor-font-family);
 }
 
-button {
-  border: none;
-  padding: var(--input-padding-vertical) var(--input-padding-horizontal);
-  width: 100%;
-  text-align: center;
-  outline: 1px solid transparent;
-  outline-offset: 2px !important;
-  color: var(--vscode-button-foreground);
-  background: var(--vscode-button-background);
-  margin-bottom: 10px;
-}
-
-button:hover {
-  cursor: pointer;
-  background: var(--vscode-button-hoverBackground);
-}
-
-button:focus {
-  outline-color: var(--vscode-focusBorder);
-}
-
-button.secondary {
-  color: var(--vscode-button-secondaryForeground);
-  background: var(--vscode-button-secondaryBackground);
-}
-
-button.secondary:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
-}
-
-input:not([type="checkbox"]),
-textarea {
-  display: block;
-  width: 100%;
-  border: none;
-  font-family: var(--vscode-font-family);
-  padding: var(--input-padding-vertical) var(--input-padding-horizontal);
-  color: var(--vscode-input-foreground);
-  outline-color: var(--vscode-input-border);
-  background-color: var(--vscode-input-background);
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: var(--vscode-input-placeholderForeground);
-}
 /* ------------------------------------------------------------------------------------ */
-body {
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-main h1 {
-  margin: 0 0 20px 0;
-  padding: 0;
-  text-align: center;
-  font-size: 1.5em;
-  color: var(--vscode-foreground);
-}
+/* Layout */
+
 main {
   display: flex;
   flex-direction: column;
@@ -117,6 +62,7 @@ main {
   justify-content: flex-start;
   padding: 20px;
 }
+
 #controllers {
   display: flex;
   flex-direction: column;
@@ -126,6 +72,7 @@ main {
   padding: 0;
   margin: 0;
 }
+
 #controllers li {
   background: var(--bb-box-background);
   width: 100%;
@@ -134,16 +81,17 @@ main {
   border: 1px solid var(--bb-box-title-background);
   list-style: none;
 }
+
 #controllers li h2 {
   margin: 0 0 15px 0;
-  padding: 0;
+  padding: 0 0 10px 0;
   color: var(--vscode-foreground);
   font-size: 1.2em;
   font-weight: bold;
   text-align: center;
   border-bottom: 1px solid var(--bb-box-title-background);
-  padding-bottom: 10px;
 }
+
 #controllers li svg {
   width: 100% !important;
   height: auto !important;
@@ -152,31 +100,139 @@ main {
   display: block;
   margin: 0 auto;
 }
+
+/* ------------------------------------------------------------------------------------ */
+/* Nodes */
+
 .node rect {
-  fill: #ffffff;
+  fill: var(--node-fill);
+  stroke: #cccccc;
+  stroke-width: 1px;
 }
+
 .node text {
-  fill: #333333;
+  fill: var(--node-text);
   font-weight: bold;
 }
+
 .initial-state rect {
-  fill: #9ef7ff !important;
+  fill: var(--node-initial-fill) !important;
+  stroke: #40c8d8;
 }
-.edgePath path {
-  fill: #ffffff;
-  stroke: #ffffff;
+
+.initial-state text {
+  fill: #0a4a50;
 }
+
+/* ------------------------------------------------------------------------------------ */
+/* Edges */
+
+.edgePath path.path {
+  fill: none;
+  stroke: var(--edge-default);
+  stroke-width: 1.5px;
+}
+
 .edgeLabel text {
-  fill: #ffffff;
+  fill: var(--edge-default);
   stroke: #000000;
   stroke-width: 0.2px;
+  font-size: 11px;
 }
+
 /* ------------------------------------------------------------------------------------ */
+/* Legend */
+
+.legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bb-box-background);
+  border: 1px solid var(--bb-box-title-background);
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  margin-bottom: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legend-swatch.default { background: var(--edge-default); }
+.legend-swatch.negated  { background: var(--edge-negated); }
+
+.legend-node {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid #aaa;
+}
+
+.legend-node.initial { background: var(--node-initial-fill); }
+.legend-node.normal  { background: var(--node-fill); }
+
+/* ------------------------------------------------------------------------------------ */
+/* Tooltip */
+
+.anim-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 10px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  max-width: 260px;
+}
+
+.tooltip-section {
+  padding: 4px 0;
+}
+
+.tooltip-section + .tooltip-section {
+  border-top: 1px solid #3a3a3a;
+  margin-top: 2px;
+}
+
+.tooltip-header {
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: 10px;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+.tooltip-row {
+  font-family: monospace;
+  font-size: 11px;
+  color: #d4d4d4;
+  white-space: nowrap;
+  padding: 1px 0;
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Console */
+
 #console {
   display: flex;
   flex-direction: column;
   width: 100%;
   font-family: monospace;
   font-size: 12px;
-  color: white;
+  color: #f08080;
+  margin-top: 12px;
+  white-space: pre-wrap;
 }

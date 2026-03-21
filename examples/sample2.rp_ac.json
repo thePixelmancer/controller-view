@@ -1,7 +1,7 @@
 {
   "format_version": "1.10.0",
   "animation_controllers": {
-    "controller.animation.sampldsadasddsddsdssasde": {
+    "controller.animation.sample1": {
       "states": {
         "default": {
           "animations": [
@@ -17,6 +17,12 @@
           "animations": [
             "idle_base",
             "attack_acid"
+          ],
+          "particle_effects": [
+            {
+              "effect": "dsadas",
+              "locator": "dass"
+            }
           ],
           "transitions": [
             {"default": "q.all_animations_finished"}
