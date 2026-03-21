@@ -14,6 +14,12 @@
           "blend_transition": 0.2
         },
         "attack": { 
+          "on_entry": [
+            "v.test =1;"
+          ],
+          "on_exit": [
+            "v.test=2;"
+          ],
           "animations": [
             "idle_base",
             "attack_acid"

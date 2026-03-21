@@ -1,10 +1,8 @@
 window.addEventListener("message", (event) => {
   const message = event.data;
-
   if (message.type === "update") {
     try {
-      const jsonData = JSON.parse(message.json);
-      generateElements(jsonData);
+      generateElements(JSON.parse(message.json));
     } catch (error) {
       showConsoleError("Failed to parse JSON: " + error.message);
     }
@@ -14,15 +12,14 @@ window.addEventListener("message", (event) => {
 });
 
 function showConsoleError(msg) {
-  const consoleEl = document.getElementById("console");
-  consoleEl.innerText += "\nError: " + msg;
+  document.getElementById("console").innerText += "\nError: " + msg;
 }
 
 function getAnimationLabel(anim) {
   if (typeof anim === "string") return anim;
   if (typeof anim === "object" && anim !== null) {
-    const entries = Object.entries(anim);
-    if (entries.length > 0) return `${entries[0][0]} [${entries[0][1]}]`;
+    const [k, v] = Object.entries(anim)[0] || [];
+    if (k) return `${k} [${v}]`;
   }
   return JSON.stringify(anim);
 }
@@ -44,53 +41,80 @@ function wrapLabel(text, maxLen = 28) {
   return lines.join("\n");
 }
 
-function isNegatedCondition(condition) {
-  return typeof condition === "string" && condition.trim().startsWith("!");
+function isNegatedCondition(c) {
+  return typeof c === "string" && c.trim().startsWith("!");
 }
 
-// Global tooltip element, created once
-let tooltip = null;
+/* ── CSS variable reader ─────────────────────────────────────────────────
+   dagre-d3 only accepts inline style strings for edge colours, so we
+   resolve the CSS custom properties at render time from the computed style
+   of the document root. This ensures edges match whatever VS Code theme
+   is active, including high-contrast and light themes.
+─────────────────────────────────────────────────────────────────────────── */
+function getCSSVar(name) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
+
+let _tooltip = null;
+let _tooltipTimer = null;
+
 function getTooltip() {
-  if (!tooltip) {
-    tooltip = document.createElement("div");
-    tooltip.className = "anim-tooltip";
-    document.body.appendChild(tooltip);
+  if (!_tooltip) {
+    _tooltip = document.createElement("div");
+    _tooltip.className = "anim-tooltip";
+    document.body.appendChild(_tooltip);
   }
-  return tooltip;
+  return _tooltip;
 }
 
 function buildTooltipHTML(groups) {
   return groups
     .filter(g => g.items.length > 0)
-    .map(g => `<div class="tooltip-section"><div class="tooltip-header">${g.label}</div>${g.items.map(item => `<div class="tooltip-row">${item}</div>`).join("")}</div>`)
+    .map(g => `
+      <div class="tooltip-section">
+        <div class="tooltip-header">${g.label}</div>
+        ${g.items.map(item => `<div class="tooltip-row">${item}</div>`).join("")}
+      </div>`)
     .join("");
 }
 
 function showTooltip(groups, x, y) {
+  clearTimeout(_tooltipTimer);
   const t = getTooltip();
   t.innerHTML = buildTooltipHTML(groups);
+  t.classList.remove("visible");
   t.style.display = "block";
   positionTooltip(x, y);
+  // Force reflow then fade in
+  requestAnimationFrame(() => t.classList.add("visible"));
 }
 
 function positionTooltip(x, y) {
   const t = getTooltip();
-  const margin = 12;
+  const margin = 14;
   const tw = t.offsetWidth;
   const th = t.offsetHeight;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
   let left = x + margin;
-  let top = y + margin;
-  if (left + tw > vw) left = x - tw - margin;
-  if (top + th > vh) top = y - th - margin;
+  let top  = y + margin;
+  if (left + tw > window.innerWidth)  left = x - tw - margin;
+  if (top  + th > window.innerHeight) top  = y - th - margin;
   t.style.left = left + "px";
-  t.style.top = top + "px";
+  t.style.top  = top  + "px";
 }
 
 function hideTooltip() {
-  if (tooltip) tooltip.style.display = "none";
+  if (!_tooltip) return;
+  _tooltip.classList.remove("visible");
+  _tooltipTimer = setTimeout(() => {
+    if (_tooltip) _tooltip.style.display = "none";
+  }, 100);
 }
+
+/* ── Main renderer ───────────────────────────────────────────────────────── */
 
 function generateElements(jsonData) {
   const controllersList = document.querySelector("#controllers");
@@ -104,29 +128,39 @@ function generateElements(jsonData) {
     return;
   }
 
+  // Read theme colours once per render pass
+  const edgeColor    = getCSSVar("--cv-edge")    || "#75beff";
+  const edgeNegColor = getCSSVar("--cv-edge-neg") || "#cca700";
+  const bgColor      = getCSSVar("--cv-bg")       || "transparent";
+  const edgeLabelColor = getCSSVar("--cv-edge-label") || getCSSVar("--cv-fg") || "#cccccc";
+
   for (const controllerName of Object.keys(animControllers)) {
     const controllerData = animControllers[controllerName];
     const states = controllerData?.states;
 
-    const controllerItem = document.createElement("li");
-    const controllerTitle = document.createElement("h2");
-    controllerTitle.textContent = controllerName;
-    controllerItem.appendChild(controllerTitle);
+    // Card shell
+    const li = document.createElement("li");
 
-    const svgContainer = document.createElement("div");
-    svgContainer.className = "svg-container";
-    const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svgElement.setAttribute("width", "100%");
-    svgElement.setAttribute("height", "0");
-    svgElement.style.display = "block";
-    svgElement.innerHTML = "<g></g>";
+    const header = document.createElement("div");
+    header.className = "card-header";
+    header.innerHTML = `<h2>${controllerName}</h2>`;
 
-    svgContainer.appendChild(svgElement);
-    controllerItem.appendChild(svgContainer);
-    controllersList.appendChild(controllerItem);
+    const body = document.createElement("div");
+    body.className = "card-body";
+
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svgEl.setAttribute("width", "100%");
+    svgEl.setAttribute("height", "0");
+    svgEl.style.display = "block";
+    svgEl.innerHTML = "<g></g>";
+
+    body.appendChild(svgEl);
+    li.appendChild(header);
+    li.appendChild(body);
+    controllersList.appendChild(li);
 
     if (!states || Object.keys(states).length === 0) {
-      consoleEl.innerText += `\nWarning: No states found in controller [${controllerName}].`;
+      consoleEl.innerText += `\nWarning: No states in controller [${controllerName}].`;
       continue;
     }
 
@@ -134,8 +168,8 @@ function generateElements(jsonData) {
       const g = new dagreD3.graphlib.Graph().setGraph({
         rankdir: "TB",
         edgesep: 20,
-        ranksep: 60,
-        nodesep: 40,
+        ranksep: 55,
+        nodesep: 35,
       });
 
       const initialState = controllerData.initial_state || "default";
@@ -145,105 +179,96 @@ function generateElements(jsonData) {
         throw new Error(`Initial state [${initialState}] not found in controller [${controllerName}]!`);
       }
 
-      // Build nodes — only state name in the box, fx data stored for tooltip
+      // ── Nodes ──────────────────────────────────────────────────────────
       stateKeys.forEach((state) => {
-        const stateData = states[state];
-        const animLines = (stateData?.animations || []).map(getAnimationLabel);
-        const particleLines = (stateData?.particle_effects || []).map(p =>
-          p.locator ? `${p.effect} @ ${p.locator}` : p.effect
-        );
-        const soundLines = (stateData?.sound_effects || []).map(s =>
-          s.locator ? `${s.effect} @ ${s.locator}` : s.effect
-        );
-        const isInitial = state === initialState;
-        const hasTooltip = animLines.length > 0 || particleLines.length > 0 || soundLines.length > 0;
+        const sd = states[state];
+        const animLines     = (sd?.animations      || []).map(getAnimationLabel);
+        const particleLines = (sd?.particle_effects || []).map(p =>
+          p.locator ? `${p.effect} @ ${p.locator}` : p.effect);
+        const soundLines    = (sd?.sound_effects    || []).map(s =>
+          s.locator ? `${s.effect} @ ${s.locator}` : s.effect);
+        const onEntryLines  = (sd?.on_entry || []).map(String);
+        const onExitLines   = (sd?.on_exit  || []).map(String);
+
+        const hasTooltip = animLines.length > 0 || particleLines.length > 0 ||
+                           soundLines.length > 0 || onEntryLines.length > 0 || onExitLines.length > 0;
 
         g.setNode(state, {
           label: state,
-          rx: 4,
-          ry: 4,
-          class: isInitial ? "initial-state" : "",
-          // Stored for tooltip — dagre ignores unknown props
+          rx: 3,
+          ry: 3,
+          class: [
+            state === initialState ? "initial-state" : "",
+            hasTooltip ? "has-tooltip" : "",
+          ].filter(Boolean).join(" "),
           _tooltipGroups: hasTooltip ? [
+            { label: "On Entry",         items: onEntryLines },
             { label: "Animations",       items: animLines },
             { label: "Particle Effects", items: particleLines },
             { label: "Sound Effects",    items: soundLines },
+            { label: "On Exit",          items: onExitLines },
           ] : null,
         });
       });
 
-      // Build edges
+      // ── Edges ──────────────────────────────────────────────────────────
       stateKeys.forEach((state) => {
         const transitions = states[state]?.transitions;
         if (!Array.isArray(transitions)) return;
 
         transitions.forEach((transition) => {
           if (!transition || typeof transition !== "object") return;
-          Object.entries(transition).forEach(([targetState, condition]) => {
-            if (!stateKeys.includes(targetState)) {
-              consoleEl.innerText += `\nWarning: Transition target [${targetState}] not found in controller [${controllerName}].`;
+          Object.entries(transition).forEach(([target, condition]) => {
+            if (!stateKeys.includes(target)) {
+              consoleEl.innerText += `\nWarning: Transition target [${target}] not found in [${controllerName}].`;
             }
-            const negated = isNegatedCondition(condition);
+            const neg = isNegatedCondition(condition);
+            const color = neg ? edgeNegColor : edgeColor;
             try {
-              g.setEdge(state, targetState, {
+              g.setEdge(state, target, {
                 label: wrapLabel(String(condition)),
                 curve: d3.curveBasis,
                 labelPos: "c",
-                style: negated
-                  ? "fill: none; stroke: #f0a05a; stroke-width: 1.5px;"
-                  : "fill: none; stroke: #ffffff; stroke-width: 1.5px;",
-                arrowheadStyle: negated ? "fill: #f0a05a;" : "fill: #ffffff;",
-                labelStyle: negated ? "fill: #f0a05a;" : "fill: #ffffff;",
+                style: `fill: none; stroke: ${color}; stroke-width: 1.5px;`,
+                arrowheadStyle: `fill: ${color};`,
+                labelStyle: `fill: ${edgeLabelColor}; font-size: 10.5px;`,
               });
-            } catch (error) {
-              throw new Error(`Error setting edge ${state} -> ${targetState}: ${error.message}`);
+            } catch (err) {
+              throw new Error(`Error setting edge ${state} -> ${target}: ${err.message}`);
             }
           });
         });
       });
 
-      const svg = d3.select(svgElement);
+      // ── Render ─────────────────────────────────────────────────────────
+      const svg   = d3.select(svgEl);
       const inner = svg.select("g");
 
-      const zoom = d3.zoom().on("zoom", function () {
-        inner.attr("transform", d3.event.transform);
-      });
+      const zoom = d3.zoom().on("zoom", () => inner.attr("transform", d3.event.transform));
       svg.call(zoom);
 
-      const render = new dagreD3.render();
-      render(inner, g);
+      new dagreD3.render()(inner, g);
 
-      // Attach tooltip listeners to each node after render
+      // Tooltip listeners (post-render, so DOM nodes exist)
       inner.selectAll("g.node").each(function(stateName) {
-        const groups = g.node(stateName)._tooltipGroups;
+        const groups = g.node(stateName)?._tooltipGroups;
         if (!groups) return;
-
-        const nodeEl = this;
-        nodeEl.style.cursor = "default";
-
-        nodeEl.addEventListener("mouseenter", (e) => {
-          showTooltip(groups, e.clientX, e.clientY);
-        });
-        nodeEl.addEventListener("mousemove", (e) => {
-          positionTooltip(e.clientX, e.clientY);
-        });
-        nodeEl.addEventListener("mouseleave", () => {
-          hideTooltip();
-        });
+        this.addEventListener("mouseenter", (e) => showTooltip(groups, e.clientX, e.clientY));
+        this.addEventListener("mousemove",  (e) => positionTooltip(e.clientX, e.clientY));
+        this.addEventListener("mouseleave", ()  => hideTooltip());
       });
 
-      const initialScale = 1;
+      // Centre and resize
       const graph = g.graph();
-      const containerWidth = svg.node().parentElement.clientWidth;
-      const graphWidth = graph.width * initialScale;
-      const centerX = Math.max(0, (containerWidth - graphWidth) / 2);
+      const containerW = svgEl.parentElement.clientWidth;
+      const cx = Math.max(0, (containerW - graph.width) / 2);
+      svg.call(zoom.transform, d3.zoomIdentity.translate(cx, 16));
+      svg.attr("height", graph.height + 40);
+      svgEl.parentElement.style.overflow = "visible";
 
-      svg.call(zoom.transform, d3.zoomIdentity.translate(centerX, 20).scale(initialScale));
-      svg.attr("height", graph.height * initialScale + 60);
-      svg.node().parentElement.style.overflow = "visible";
-    } catch (error) {
-      console.error("Error rendering graph:", error);
-      consoleEl.innerText += "\nError: " + error.message;
+    } catch (err) {
+      console.error(err);
+      consoleEl.innerText += "\nError: " + err.message;
     }
   }
 }

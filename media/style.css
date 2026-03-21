@@ -1,158 +1,98 @@
 * {
   box-sizing: border-box;
 }
+
+/* ── Theme-aware custom properties ─────────────────────────────────────────
+   All colours are derived from VS Code's own CSS variables so the viewer
+   works correctly on every theme: dark, light, high-contrast dark/light.
+   We never hardcode a palette colour — every value is either a VS Code var
+   or a CSS calc/opacity on top of one.
+─────────────────────────────────────────────────────────────────────────── */
 :root {
-  --container-padding: 20px;
-  --input-padding-vertical: 6px;
-  --input-padding-horizontal: 4px;
-  --input-margin-vertical: 4px;
-  --input-margin-horizontal: 0;
+  /* Surfaces */
+  --cv-bg:           var(--vscode-sideBar-background,          var(--vscode-editor-background));
+  --cv-card-bg:      var(--vscode-editorWidget-background,     var(--vscode-editor-background));
+  --cv-card-border:  var(--vscode-editorWidget-border,         var(--vscode-panel-border, transparent));
+  --cv-divider:      var(--vscode-panel-border,                var(--vscode-editorGroup-border, transparent));
 
-  --bb-background: #282b2d;
-  --bb-box-background: #212325;
-  --bb-box-title-background: #323638;
+  /* Text */
+  --cv-fg:           var(--vscode-foreground);
+  --cv-fg-muted:     var(--vscode-descriptionForeground,       var(--vscode-foreground));
+  --cv-fg-subtle:    var(--vscode-disabledForeground,          var(--vscode-foreground));
 
-  --edge-default: #ffffff;
-  --edge-negated: #f0a05a;
-  --node-fill: #ffffff;
-  --node-initial-fill: #9ef7ff;
-  --node-text: #1a1a1a;
+  /* Nodes */
+  --cv-node-bg:      var(--vscode-badge-background,            #0078d4);
+  --cv-node-fg:      var(--vscode-badge-foreground,            #ffffff);
+  --cv-node-border:  var(--vscode-focusBorder,                 #0078d4);
+
+  --cv-node-init-bg: var(--vscode-terminal-ansiGreen,          #4ec9b0);
+  --cv-node-init-fg: var(--vscode-terminal-background,         #000000);
+  --cv-node-init-border: var(--vscode-terminal-ansiBrightGreen, #4ec9b0);
+
+  --cv-node-hover-bg: var(--vscode-list-hoverBackground, rgba(255,255,255,0.08));
+
+  /* Edges */
+  --cv-edge:         var(--vscode-editorInfo-foreground,       #75beff);
+  --cv-edge-neg:     var(--vscode-editorWarning-foreground,    #cca700);
+  --cv-edge-label:   var(--vscode-foreground);
+
+  /* Tooltip */
+  --cv-tip-bg:       var(--vscode-editorHoverWidget-background, var(--vscode-editor-background));
+  --cv-tip-border:   var(--vscode-editorHoverWidget-border,    var(--vscode-panel-border));
+  --cv-tip-fg:       var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  --cv-tip-heading:  var(--vscode-descriptionForeground,       var(--vscode-foreground));
+
+  /* Errors */
+  --cv-error:        var(--vscode-errorForeground,             #f48771);
+
+  /* Spacing */
+  --cv-radius:       3px;
+  --cv-padding:      16px;
 }
 
+/* ── Reset / base ────────────────────────────────────────────────────────── */
+
 body {
-  padding: 0;
   margin: 0;
-  color: var(--vscode-foreground);
-  font-size: var(--vscode-font-size);
-  font-weight: var(--vscode-font-weight);
-  font-family: var(--vscode-font-family);
-  background-color: var(--bb-background);
+  padding: 0;
+  background: var(--cv-bg);
+  color: var(--cv-fg);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  font-weight: var(--vscode-font-weight, normal);
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-body > *,
-form > * {
-  margin-block-start: var(--input-margin-vertical);
-  margin-block-end: var(--input-margin-vertical);
 }
 
 *:focus {
   outline-color: var(--vscode-focusBorder) !important;
 }
 
-a { color: var(--vscode-textLink-foreground); }
-a:hover, a:active { color: var(--vscode-textLink-activeForeground); }
-
-code {
-  font-size: var(--vscode-editor-font-size);
-  font-family: var(--vscode-editor-font-family);
-}
-
-/* ------------------------------------------------------------------------------------ */
-/* Layout */
+/* ── Layout ──────────────────────────────────────────────────────────────── */
 
 main {
   display: flex;
   flex-direction: column;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  justify-content: flex-start;
-  padding: 20px;
+  gap: var(--cv-padding);
+  padding: var(--cv-padding);
+  min-height: 100vh;
 }
 
-#controllers {
-  display: flex;
-  flex-direction: column;
-  gap: 2em;
-  list-style: none;
-  width: 100%;
-  padding: 0;
-  margin: 0;
-}
-
-#controllers li {
-  background: var(--bb-box-background);
-  width: 100%;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--bb-box-title-background);
-  list-style: none;
-}
-
-#controllers li h2 {
-  margin: 0 0 15px 0;
-  padding: 0 0 10px 0;
-  color: var(--vscode-foreground);
-  font-size: 1.2em;
-  font-weight: bold;
-  text-align: center;
-  border-bottom: 1px solid var(--bb-box-title-background);
-}
-
-#controllers li svg {
-  width: 100% !important;
-  height: auto !important;
-  max-width: none !important;
-  min-height: 100px !important;
-  display: block;
-  margin: 0 auto;
-}
-
-/* ------------------------------------------------------------------------------------ */
-/* Nodes */
-
-.node rect {
-  fill: var(--node-fill);
-  stroke: #cccccc;
-  stroke-width: 1px;
-}
-
-.node text {
-  fill: var(--node-text);
-  font-weight: bold;
-}
-
-.initial-state rect {
-  fill: var(--node-initial-fill) !important;
-  stroke: #40c8d8;
-}
-
-.initial-state text {
-  fill: #0a4a50;
-}
-
-/* ------------------------------------------------------------------------------------ */
-/* Edges */
-
-.edgePath path.path {
-  fill: none;
-  stroke: var(--edge-default);
-  stroke-width: 1.5px;
-}
-
-.edgeLabel text {
-  fill: var(--edge-default);
-  stroke: #000000;
-  stroke-width: 0.2px;
-  font-size: 11px;
-}
-
-/* ------------------------------------------------------------------------------------ */
-/* Legend */
+/* ── Legend ──────────────────────────────────────────────────────────────── */
 
 .legend {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 6px 18px;
   align-items: center;
-  padding: 8px 12px;
-  background: var(--bb-box-background);
-  border: 1px solid var(--bb-box-title-background);
+  padding: 7px 12px;
+  background: var(--cv-card-bg);
+  border: 1px solid var(--cv-card-border);
+  border-radius: var(--cv-radius);
   font-size: 11px;
-  color: var(--vscode-foreground);
-  margin-bottom: 0;
+  color: var(--cv-fg-muted);
+  user-select: none;
 }
 
 .legend-item {
@@ -162,77 +102,234 @@ main {
 }
 
 .legend-swatch {
-  width: 24px;
-  height: 3px;
-  border-radius: 2px;
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
 }
 
-.legend-swatch.default { background: var(--edge-default); }
-.legend-swatch.negated  { background: var(--edge-negated); }
+.legend-swatch.default { background: var(--cv-edge); }
+.legend-swatch.negated  { background: var(--cv-edge-neg); }
 
 .legend-node {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 2px;
-  border: 1px solid #aaa;
+  flex-shrink: 0;
+  border: 1.5px solid;
 }
 
-.legend-node.initial { background: var(--node-initial-fill); }
-.legend-node.normal  { background: var(--node-fill); }
+.legend-node.normal  {
+  background: var(--cv-node-bg);
+  border-color: var(--cv-node-border);
+}
+.legend-node.initial {
+  background: var(--cv-node-init-bg);
+  border-color: var(--cv-node-init-border);
+}
 
-/* ------------------------------------------------------------------------------------ */
-/* Tooltip */
+/* ── Controller cards ────────────────────────────────────────────────────── */
+
+#controllers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cv-padding);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#controllers li {
+  list-style: none;
+  background: var(--cv-card-bg);
+  border: 1px solid var(--cv-card-border);
+  border-radius: var(--cv-radius);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px var(--cv-padding);
+  border-bottom: 1px solid var(--cv-divider);
+  background: var(--vscode-sideBarSectionHeader-background, transparent);
+}
+
+.card-header h2 {
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vscode-sideBarSectionHeader-foreground, var(--cv-fg-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-body {
+  padding: 12px;
+}
+
+#controllers li svg {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+  min-height: 60px;
+}
+
+/* ── Nodes ───────────────────────────────────────────────────────────────── */
+
+.node rect {
+  fill: var(--cv-node-bg);
+  stroke: var(--cv-node-border);
+  stroke-width: 1.5px;
+  rx: 3px;
+  ry: 3px;
+  transition: filter 0.1s;
+}
+
+.node text {
+  fill: var(--cv-node-fg) !important;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+}
+
+.node:hover rect {
+  filter: brightness(1.15);
+  cursor: default;
+}
+
+.node.has-tooltip {
+  cursor: default;
+}
+
+.node.has-tooltip rect {
+  stroke-dasharray: none;
+}
+
+/* Subtle underline hint that hover is available */
+.node.has-tooltip text {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.initial-state rect {
+  fill: var(--cv-node-init-bg) !important;
+  stroke: var(--cv-node-init-border) !important;
+}
+
+.initial-state text {
+  fill: var(--cv-node-init-fg) !important;
+}
+
+/* ── Edges ───────────────────────────────────────────────────────────────── */
+
+/* Inline styles in dagre-d3 override CSS for path colour, so we use
+   CSS variables that are read at render time in script.js instead. */
+
+.edgePath path {
+  fill: none;
+}
+
+.edgeLabel {
+  background: transparent;
+}
+
+.edgeLabel rect {
+  /* dagre adds a white bg rect behind labels — make it transparent */
+  fill: transparent !important;
+  opacity: 0 !important;
+}
+
+.edgeLabel text {
+  font-size: 10.5px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  /* colour is set inline per-edge in script.js using the CSS var value */
+  paint-order: stroke fill;
+  stroke-width: 3px;
+  stroke: var(--cv-bg);
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
 
 .anim-tooltip {
   display: none;
   position: fixed;
   z-index: 9999;
-  background: #1e1e1e;
-  border: 1px solid #444;
-  border-radius: 4px;
-  padding: 6px 10px;
+  background: var(--cv-tip-bg);
+  border: 1px solid var(--cv-tip-border);
+  border-radius: var(--cv-radius);
+  padding: 0;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  max-width: 260px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  max-width: 280px;
+  min-width: 140px;
+  overflow: hidden;
+  /* Fade in smoothly */
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.anim-tooltip.visible {
+  opacity: 1;
 }
 
 .tooltip-section {
-  padding: 4px 0;
+  padding: 6px 10px;
 }
 
 .tooltip-section + .tooltip-section {
-  border-top: 1px solid #3a3a3a;
-  margin-top: 2px;
+  border-top: 1px solid var(--cv-divider);
 }
 
 .tooltip-header {
-  font-family: var(--vscode-font-family, sans-serif);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
   font-size: 10px;
-  font-weight: bold;
-  color: #888;
+  font-weight: 700;
+  color: var(--cv-tip-heading);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 3px;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+  opacity: 0.65;
 }
 
 .tooltip-row {
-  font-family: monospace;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--vscode-editor-font-family, monospace);
   font-size: 11px;
-  color: #d4d4d4;
+  color: var(--cv-tip-fg);
+  padding: 1.5px 0;
   white-space: nowrap;
-  padding: 1px 0;
 }
 
-/* ------------------------------------------------------------------------------------ */
-/* Console */
+.tooltip-row::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+/* ── Console / error output ─────────────────────────────────────────────── */
 
 #console {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  font-family: monospace;
-  font-size: 12px;
-  color: #f08080;
-  margin-top: 12px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11.5px;
+  color: var(--cv-error);
   white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+#console:empty {
+  display: none;
 }
