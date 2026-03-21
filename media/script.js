@@ -437,16 +437,30 @@ function hideTooltip() {
 
 function buildSimPanel(queries, variables, conflicts) {
   const panel = document.getElementById("sim-panel");
+  // Preserve collapsed state across rebuilds
+  const wasCollapsed = panel.classList.contains("collapsed");
   panel.innerHTML = "";
+  panel.classList.toggle("collapsed", wasCollapsed);
 
-  // ── Header ──────────────────────────────────────────────────────────────
+  // ── Header (also acts as collapse toggle) ───────────────────────────────
   const header = document.createElement("div");
   header.className = "sim-header";
+  header.title = "Click to expand / collapse";
+
+  const titleRow = document.createElement("div");
+  titleRow.style.cssText = "display:flex;align-items:center;gap:8px;flex:1;min-width:0;";
+
+  const chevron = document.createElement("span");
+  chevron.className = "sim-chevron";
+  chevron.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/></svg>`;
 
   const title = document.createElement("span");
   title.className = "sim-title";
   title.textContent = "Simulator";
-  header.appendChild(title);
+
+  titleRow.appendChild(chevron);
+  titleRow.appendChild(title);
+  header.appendChild(titleRow);
 
   const controls = document.createElement("div");
   controls.className = "sim-controls";
@@ -455,13 +469,18 @@ function buildSimPanel(queries, variables, conflicts) {
   resetBtn.className = "sim-btn";
   resetBtn.title = "Reset to initial state";
   resetBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg> Reset`;
-  resetBtn.addEventListener("click", () => { SIM.reset(); updateSimStatus(); });
+  resetBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // don't collapse when clicking Reset
+    SIM.reset();
+    updateSimStatus();
+  });
 
   const playBtn = document.createElement("button");
   playBtn.className = "sim-btn sim-btn-primary";
   playBtn.id = "sim-play-btn";
   playBtn.innerHTML = playBtnHTML(false);
-  playBtn.addEventListener("click", () => {
+  playBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // don't collapse when clicking Play
     SIM.running ? SIM.pause() : SIM.play();
     playBtn.innerHTML = playBtnHTML(SIM.running);
     playBtn.classList.toggle("sim-btn-active", SIM.running);
@@ -470,7 +489,17 @@ function buildSimPanel(queries, variables, conflicts) {
   controls.appendChild(resetBtn);
   controls.appendChild(playBtn);
   header.appendChild(controls);
+
+  // Toggle collapse on header click
+  header.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+  });
+
   panel.appendChild(header);
+
+  // ── Scrollable body ──────────────────────────────────────────────────────
+  const body = document.createElement("div");
+  body.className = "sim-body";
 
   const hasAnything = queries.size > 0 || variables.size > 0;
 
@@ -478,7 +507,8 @@ function buildSimPanel(queries, variables, conflicts) {
     const empty = document.createElement("div");
     empty.className = "sim-empty";
     empty.textContent = "No queries or variables found in this file.";
-    panel.appendChild(empty);
+    body.appendChild(empty);
+    panel.appendChild(body);
     return;
   }
 
@@ -494,14 +524,14 @@ function buildSimPanel(queries, variables, conflicts) {
         ${c}
       </div>`
     ).join("");
-    panel.appendChild(warnBox);
+    body.appendChild(warnBox);
   }
 
   // ── Status bar ──────────────────────────────────────────────────────────
   const status = document.createElement("div");
   status.className = "sim-status";
   status.id = "sim-status";
-  panel.appendChild(status);
+  body.appendChild(status);
   updateSimStatus();
 
   // ── Symbol grid ─────────────────────────────────────────────────────────
@@ -524,7 +554,8 @@ function buildSimPanel(queries, variables, conflicts) {
     for (const [name, info] of variables) grid.appendChild(buildSymbolRow("v", name, info));
   }
 
-  panel.appendChild(grid);
+  body.appendChild(grid);
+  panel.appendChild(body);
 }
 
 function playBtnHTML(playing) {
@@ -652,6 +683,12 @@ function loadController(jsonData, rawJson, cursorLine) {
   const { queries, variables, conflicts } = extractSymbols(focusedControllers);
   SIM.initSymbols(queries, variables);
 
+  // Start collapsed — buildSimPanel will preserve state on subsequent rebuilds
+  const simPanel = document.getElementById("sim-panel");
+  if (!simPanel.dataset.everBuilt) {
+    simPanel.classList.add("collapsed");
+    simPanel.dataset.everBuilt = "1";
+  }
   buildSimPanel(queries, variables, conflicts);
   SIM._onChange = updateSimStatus;
 

@@ -392,6 +392,27 @@ main {
   border: 1px solid var(--cv-card-border);
   border-radius: var(--cv-radius);
   overflow: hidden;
+  /* Cap at one third of the viewport; the body scrolls inside */
+  max-height: 33vh;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0; /* never compress — graph gets all leftover space */
+}
+
+.sim-panel.collapsed {
+  max-height: none; /* header-only, no cap needed */
+}
+
+/* Scrollable body — everything below the header */
+.sim-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.sim-panel.collapsed .sim-body {
+  display: none;
 }
 
 /* Header */
@@ -403,6 +424,29 @@ main {
   border-bottom: 1px solid var(--cv-divider);
   background: var(--vscode-sideBarSectionHeader-background, transparent);
   gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sim-header:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08));
+}
+
+.sim-panel.collapsed .sim-header {
+  border-bottom: none;
+}
+
+/* Chevron icon — rotates when expanded */
+.sim-chevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.sim-panel:not(.collapsed) .sim-chevron {
+  transform: rotate(180deg);
 }
 
 .sim-title {
