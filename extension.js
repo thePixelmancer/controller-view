@@ -38,9 +38,14 @@ function activate(context) {
   };
 
   const postUpdate = (panel, document) => {
+    const editor = vscode.window.activeTextEditor;
+    const cursorLine = (editor && editor.document === document)
+      ? editor.selection.active.line
+      : 0;
     panel.webview.postMessage({
       type: "update",
       json: document.getText(),
+      cursorLine,
     });
   };
 
@@ -72,8 +77,18 @@ function activate(context) {
       }
     );
 
+    // Re-send when the cursor moves so the active controller updates
+    const selectionSubscription = vscode.window.onDidChangeTextEditorSelection(
+      (event) => {
+        if (isValidControllerFile(event.textEditor.document)) {
+          postUpdate(panel, event.textEditor.document);
+        }
+      }
+    );
+
     panel.onDidDispose(() => {
       changeSubscription.dispose();
+      selectionSubscription.dispose();
       currentPanel = null;
     });
 

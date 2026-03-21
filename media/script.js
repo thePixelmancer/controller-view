@@ -2,7 +2,7 @@ window.addEventListener("message", (event) => {
   const message = event.data;
   if (message.type === "update") {
     try {
-      loadController(JSON.parse(message.json));
+      loadController(JSON.parse(message.json), message.json, message.cursorLine ?? 0);
     } catch (error) {
       showConsoleError("Failed to parse JSON: " + error.message);
     }
@@ -51,6 +51,41 @@ function isNegatedCondition(c) {
 
 function getCSSVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Active controller detection
+   Scans the raw JSON text for each controller key's line number, then
+   returns the name of the controller whose opening line is the highest
+   one that is still <= the cursor line — i.e. the block the cursor is in.
+═══════════════════════════════════════════════════════════════════════════ */
+
+function activeControllerName(rawJson, cursorLine, controllerNames) {
+  if (controllerNames.length === 1) return controllerNames[0];
+
+  // Find the line number of each controller key in the raw text
+  const lines = rawJson.split("\n");
+  const keyLines = []; // [{name, line}]
+
+  for (const name of controllerNames) {
+    // Match the quoted key exactly
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`"${escaped}"`);
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        keyLines.push({ name, line: i });
+        break;
+      }
+    }
+  }
+
+  // Sort by line ascending, pick the last one whose line <= cursorLine
+  keyLines.sort((a, b) => a.line - b.line);
+  let active = keyLines[0]?.name ?? controllerNames[0];
+  for (const { name, line } of keyLines) {
+    if (line <= cursorLine) active = name;
+  }
+  return active;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -589,7 +624,7 @@ function buildSymbolRow(prefix, name, info) {
    Main renderer
 ═══════════════════════════════════════════════════════════════════════════ */
 
-function loadController(jsonData) {
+function loadController(jsonData, rawJson, cursorLine) {
   const controllersList = document.querySelector("#controllers");
   controllersList.innerHTML = "";
   const consoleEl = document.getElementById("console");
@@ -601,11 +636,18 @@ function loadController(jsonData) {
     return;
   }
 
+  // Determine which single controller to display based on cursor position
+  const allControllerNames = Object.keys(animControllers);
+  const focusedName = activeControllerName(rawJson, cursorLine, allControllerNames);
+  // Build a filtered view with only the focused controller, but extract
+  // symbols from the full file so simulator state is shared across all
+  const focusedControllers = { [focusedName]: animControllers[focusedName] };
+
   SIM.pause();
   const playBtn = document.getElementById("sim-play-btn");
   if (playBtn) { playBtn.innerHTML = playBtnHTML(false); playBtn.classList.remove("sim-btn-active"); }
 
-  const { queries, variables, conflicts } = extractSymbols(animControllers);
+  const { queries, variables, conflicts } = extractSymbols(focusedControllers);
   SIM.initSymbols(queries, variables);
 
   buildSimPanel(queries, variables, conflicts);
@@ -620,7 +662,7 @@ function loadController(jsonData) {
 
   const simControllers = [];
 
-  for (const [controllerName, controllerData] of Object.entries(animControllers)) {
+  for (const [controllerName, controllerData] of Object.entries(focusedControllers)) {
     const states = controllerData?.states;
 
     const li     = document.createElement("li");
