@@ -119,7 +119,7 @@ function evalCondition(expr, queries, variables) {
    ─────────────────────────────────────────────────────────────────────────
    We scan every expression each symbol appears in and collect a set of
    "usage kinds":
-     boolean  — symbol appears bare, negated (!q.x), or in a logical chain
+     boolean  — symbol appears bare (!q.x) or in a logical chain
                 without any numeric/string comparison
      numeric  — symbol appears in >, <, >=, <=, or compared to a number
                 literal, or used in arithmetic (+, -, *, /)
@@ -270,16 +270,19 @@ class SimController {
 
   tick(queries, variables) {
     const stateData = this.data.states?.[this.currentState];
-    if (!stateData) return false;
+    if (!stateData) return null;
     for (const t of stateData.transitions || []) {
       for (const [target, cond] of Object.entries(t)) {
         if (evalCondition(cond, queries, variables) && target !== this.currentState) {
+          const from = this.currentState;
           this.currentState = target;
-          return true;
+          // blend_transition is on the FROM state (blending away from it)
+          const blendDuration = this.data.states?.[from]?.blend_transition ?? 0;
+          return { from, to: target, blendDuration };
         }
       }
     }
-    return false;
+    return null;
   }
 
   repaint() {
@@ -292,12 +295,101 @@ class SimController {
         stateName === this.currentState ? "sim-active" : "sim-inactive", true
       );
     });
+    // NOTE: do NOT interrupt edge transitions here — that cancels flashEdge.
+    // Interrupts only happen on explicit reset/rebuild via clearEdgeFlash().
+  }
+
+  clearEdgeFlash() {
+    if (!this._svgInner) return;
+    this._svgInner.node().querySelectorAll("g.edgePath").forEach(grp => {
+      const pathEl = grp.querySelector("path.path");
+      if (!pathEl) return;
+      pathEl.style.transition  = "none";
+      pathEl.style.stroke      = grp.dataset.baseStroke || "";
+      pathEl.style.strokeWidth = "1.5px";
+
+      const markerId = grp.dataset.markerId;
+      const svgRoot  = pathEl.ownerSVGElement;
+      if (markerId && svgRoot) {
+        const mp = svgRoot.querySelector("#" + CSS.escape(markerId) + " path");
+        if (mp) {
+          mp.style.transition = "none";
+          mp.style.fill       = grp.dataset.baseArrowFill || "";
+        }
+      }
+    });
   }
 
   clearPaint() {
     if (!this._svgInner) return;
     this._svgInner.selectAll("g.node")
       .classed("sim-active", false).classed("sim-inactive", false);
+    this.clearEdgeFlash();
+  }
+
+  /**
+   * Flash the edge from→to.
+   *
+   * Strategy:
+   *   1. Set inline style stroke/fill to the flash colour immediately
+   *      (inline style overrides dagre's style *attribute*)
+   *   2. Set the CSS transition duration from the source state's blend_transition
+   *   3. On the next frame restore the inline stroke/fill to "" — the CSS
+   *      transition then fades it back to the attribute-defined base colour
+   *
+   * blend_transition === 0  →  0.15s linear snap
+   * blend_transition  >  0  →  blend_transition seconds ease-out fade
+   *
+   * The arrowhead <marker><path> lives inside g.edgePath > defs (confirmed
+   * from dagre-d3 source). Its base fill is set via style *attribute* by dagre,
+   * so clearing the inline style.fill lets it revert to the attribute value.
+   */
+  flashEdge(from, to) {
+    if (!this._svgInner) return;
+
+    const flashColor = getComputedStyle(document.documentElement)
+      .getPropertyValue("--cv-sim-flash").trim() || "#ffffff";
+
+    this._svgInner.selectAll("g.edgePath").each(function(d) {
+      if (d.v !== from || d.w !== to) return;
+
+      const pathEl = this.querySelector("path.path");
+      if (!pathEl) return;
+
+      // Read the colours we cached at render time — never clear to ""
+      const baseStroke    = this.dataset.baseStroke    || "";
+      const baseArrowFill = this.dataset.baseArrowFill || "";
+      const blendDuration = parseFloat(this.dataset.blendDuration) || 0;
+      const duration      = blendDuration > 0 ? `${blendDuration}s` : "0.15s";
+      const easing        = blendDuration > 0 ? "ease-out" : "linear";
+
+      const markerId   = this.dataset.markerId;
+      const svgRoot    = pathEl.ownerSVGElement;
+      const markerPath = markerId && svgRoot
+        ? svgRoot.querySelector("#" + CSS.escape(markerId) + " path")
+        : null;
+
+      // Frame 0: snap to flash colour, no transition
+      pathEl.style.transition  = "none";
+      pathEl.style.stroke      = flashColor;
+      pathEl.style.strokeWidth = "3px";
+      if (markerPath) {
+        markerPath.style.transition = "none";
+        markerPath.style.fill       = flashColor;
+      }
+
+      // Frame 1: arm the transition, then set the explicit base colour as target.
+      // The browser sees the colour change and animates it over duration.
+      requestAnimationFrame(() => {
+        pathEl.style.transition  = `stroke ${duration} ${easing}, stroke-width ${duration} ${easing}`;
+        pathEl.style.stroke      = baseStroke;
+        pathEl.style.strokeWidth = "1.5px";
+        if (markerPath) {
+          markerPath.style.transition = `fill ${duration} ${easing}`;
+          markerPath.style.fill       = baseArrowFill;
+        }
+      });
+    });
   }
 }
 
@@ -368,7 +460,11 @@ class SimEngine {
   _tick() {
     let changed = false;
     for (const c of this.controllers) {
-      if (c.tick(this.queries, this.variables)) changed = true;
+      const transition = c.tick(this.queries, this.variables);
+      if (transition) {
+        changed = true;
+        c.flashEdge(transition.from, transition.to);
+      }
       c.repaint();
     }
     if (changed && this._onChange) this._onChange();
@@ -696,7 +792,6 @@ function loadController(jsonData, rawJson, cursorLine) {
   for (const c of conflicts) showConsoleError("Type conflict: " + c);
 
   const edgeColor      = getCSSVar("--cv-edge")       || "#75beff";
-  const edgeNegColor   = getCSSVar("--cv-edge-neg")   || "#cca700";
   const edgeLabelColor = getCSSVar("--cv-edge-label") || getCSSVar("--cv-fg") || "#cccccc";
 
   const simControllers = [];
@@ -766,8 +861,7 @@ function loadController(jsonData, rawJson, cursorLine) {
           Object.entries(transition).forEach(([target, condition]) => {
             if (!stateKeys.includes(target))
               consoleEl.innerText += `\nWarning: Transition target [${target}] not found in [${controllerName}].`;
-            const neg = isNegatedCondition(condition);
-            const color = neg ? edgeNegColor : edgeColor;
+            const color = edgeColor;
             try {
               g.setEdge(state, target, {
                 label: wrapLabel(String(condition)),
@@ -788,6 +882,31 @@ function loadController(jsonData, rawJson, cursorLine) {
       const zoom  = d3.zoom().on("zoom", () => inner.attr("transform", d3.event.transform));
       svg.call(zoom);
       new dagreD3.render()(inner, g);
+
+      // After dagre renders, cache per-edge data for flashEdge():
+      //   blendDuration — from the source state's blend_transition
+      //   baseStroke    — the actual resolved stroke colour dagre set
+      //   baseArrowFill — the actual resolved arrowhead fill colour
+      inner.selectAll("g.edgePath").each(function(d) {
+        this.dataset.blendDuration = states[d.v]?.blend_transition ?? 0;
+
+        const pathEl = this.querySelector("path.path");
+        if (!pathEl) return;
+
+        // getComputedStyle resolves the colour dagre wrote as a style attribute
+        this.dataset.baseStroke = getComputedStyle(pathEl).stroke || "";
+
+        const markerEnd = pathEl.getAttribute("marker-end") || "";
+        const m = markerEnd.match(/url\([^#]*#([^)]+)\)/);
+        if (m) {
+          this.dataset.markerId = m[1];
+          const svgRoot = pathEl.ownerSVGElement;
+          const mp = svgRoot && svgRoot.querySelector(
+            "#" + CSS.escape(m[1]) + " path"
+          );
+          if (mp) this.dataset.baseArrowFill = getComputedStyle(mp).fill || "";
+        }
+      });
 
       inner.selectAll("g.node").each(function(stateName) {
         const groups = g.node(stateName)?._tooltipGroups;

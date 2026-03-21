@@ -350,6 +350,16 @@ main {
   display: none;
 }
 
+/* ── Edge flash animation ────────────────────────────────────────────────── */
+/*
+   Flash works via inline style manipulation in flashEdge():
+     Frame 0: inline style.stroke = flashColor, style.transition = "none"
+     Frame 1: inline style.transition = "stroke Xs ease-out", style.stroke = ""
+   Clearing the inline stroke causes the element to fall back to dagre's
+   style *attribute* value, and the CSS transition animates that change.
+   No CSS classes or rules needed here — it's all driven from JS.
+*/
+
 /* ── Simulation: active / inactive node states ───────────────────────────── */
 
 .node.sim-active rect {
@@ -361,18 +371,13 @@ main {
   font-weight: 700 !important;
 }
 
-.node.sim-inactive rect {
-  opacity: 0.35;
-}
 
-.node.sim-inactive text {
-  opacity: 0.35;
-}
 
 /* ── Simulator panel ─────────────────────────────────────────────────────── */
 
 :root {
   --cv-sim-active-glow: var(--vscode-terminal-ansiGreen, #4ec9b0);
+  --cv-sim-flash:       var(--vscode-terminal-ansiBrightWhite, #ffffff);
   --cv-sim-btn-bg:      var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
   --cv-sim-btn-fg:      var(--vscode-button-secondaryForeground, var(--cv-fg));
   --cv-sim-btn-hover:   var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));

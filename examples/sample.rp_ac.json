@@ -6,7 +6,7 @@
         "default": {
           "animations": ["idle_base"],
           "transitions": [
-            { "attack": "v.attack_time == 5 && v.something == 4" }
+            { "attack": "v.attack_time" }
           ],
           "blend_transition": 0.2
         },
